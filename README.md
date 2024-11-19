@@ -1,1 +1,1 @@
-# k8s-device-plugin
+# CXI Kubernetes device plugin
