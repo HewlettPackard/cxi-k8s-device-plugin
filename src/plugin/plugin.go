@@ -1,13 +1,15 @@
-package main
+package plugin
 
 import (
+	"fmt"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"regexp"
 	"syscall"
 
-	"https://github.hpe.com/caio-davi/cxi-k8s-device-plugin/src/hpecxi/hpecxi"
+	"cxi-k8s-device-plugin/src/hpecxi"
+
 	"github.com/golang/glog"
 	"github.com/kubevirt/device-plugin-manager/pkg/dpm"
 	"golang.org/x/net/context"
@@ -18,7 +20,7 @@ const resourceNamespace string = "beta.hpe.com"
 
 // Plugin is identical to DevicePluginServer interface of device plugin API.
 type HPECXIPlugin struct {
-	CXIs   map[string]map[string]int
+	CXIs      map[string]int
 	Heartbeat chan bool
 	signal    chan os.Signal
 }
@@ -38,10 +40,10 @@ type HPECXILister struct {
 // method could be used to prepare resources before they are offered
 // to Kubernetes.
 func (p *HPECXIPlugin) Start() error {
-	p.signal =  make(chan os.Signal, 1)
+	p.signal = make(chan os.Signal, 1)
 	// Create cxi_service here
 	signal.Notify(p.signal, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
-	
+
 	return nil
 }
 
@@ -72,6 +74,7 @@ func countCXIFromTopology(topoRootParam ...string) int {
 
 	for _, nodeFile := range nodeFiles {
 		// Count available Cassini devices.
+		fmt.Println(nodeFile)
 		count++
 	}
 	return count
@@ -111,7 +114,7 @@ func (p *HPECXIPlugin) ListAndWatch(e *pluginapi.Empty, s pluginapi.DevicePlugin
 	devs := make([]*pluginapi.Device, len(p.CXIs))
 	s.Send(&pluginapi.ListAndWatchResponse{Devices: devs})
 
-	loop:
+loop:
 	for {
 		select {
 		case <-p.Heartbeat:

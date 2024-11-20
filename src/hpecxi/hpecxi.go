@@ -1,4 +1,4 @@
-package main
+package hpecxi
 
 import (
 	"io/ioutil"
