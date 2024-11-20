@@ -111,10 +111,11 @@ func (p *HPECXIPlugin) ListAndWatch(e *pluginapi.Empty, s pluginapi.DevicePlugin
 	p.CXIs = hpecxi.GetHPECXIs()
 
 	glog.Infof("Found %d HPE Slingshot NICs.", len(p.CXIs))
+
 	devs := make([]*pluginapi.Device, len(p.CXIs))
 	s.Send(&pluginapi.ListAndWatchResponse{Devices: devs})
 
-loop:
+	loop:
 	for {
 		select {
 		case <-p.Heartbeat:
@@ -159,16 +160,20 @@ func (p *HPECXIPlugin) Allocate(ctx context.Context, r *pluginapi.AllocateReques
 	for _, req := range r.ContainerRequests {
 		car = pluginapi.ContainerAllocateResponse{}
 
-		// Currently, there are only 1 /dev/kfd per nodes regardless of the # of GPU available
-		// for compute/rocm/HSA use cases
-		dev = new(pluginapi.DeviceSpec)
-		dev.HostPath = "/dev"
-		dev.ContainerPath = "/dev"
-		dev.Permissions = "rw"
-		car.Devices = append(car.Devices, dev)
-
 		for _, id := range req.DevicesIDs {
-			glog.Infof("Allocating device ID: %s", id)
+			glog.Infof("Allocating device ID: %d", id)
+
+			fmt.Println(id)
+			os.Exit(3)
+			for i := range p.CXIs[id] {
+				devpath := fmt.Sprintf("/dev/cxi%d", i)
+				dev = new(pluginapi.DeviceSpec)
+				dev.HostPath = devpath
+				dev.ContainerPath = devpath
+				dev.Permissions = "rw"
+				car.Devices = append(car.Devices, dev)
+			}
+
 		}
 
 		response.ContainerResponses = append(response.ContainerResponses, &car)

@@ -28,7 +28,7 @@ func GetHPECXIs() map[string]int {
 
 		for _, devPath := range devPaths {
 			name := filepath.Base(devPath)
-			if name == "hsn" {
+			if name[0:3] == "hsn" {
 				nic_id, _ := strconv.Atoi(name[len(name)-1:])
 				devices[name] = nic_id
 			}
