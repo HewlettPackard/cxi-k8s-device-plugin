@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"syscall"
+	"strconv"
 
 	"cxi-k8s-device-plugin/src/hpecxi"
 
@@ -80,15 +81,15 @@ func countCXIFromTopology(topoRootParam ...string) int {
 	return count
 }
 
-func simpleHealthCheck() bool {
+func cxiSimpleHealthCheck(device *pluginapi.Device) string {
 	var cxi *os.File
 	var err error
-	if cxi, err = os.Open("/dev/cxi"); err != nil {
-		glog.Error("Error opening /dev/cxi")
-		return false
+	if cxi, err = os.Open("/dev/cxi" + device.ID); err != nil {
+		glog.Error("Error opening /dev/cxi" + device.ID)
+		return pluginapi.Unhealthy
 	}
 	cxi.Close()
-	return true
+	return pluginapi.Healthy
 }
 
 // GetDevicePluginOptions returns options to be communicated with Device
@@ -113,22 +114,29 @@ func (p *HPECXIPlugin) ListAndWatch(e *pluginapi.Empty, s pluginapi.DevicePlugin
 	glog.Infof("Found %d HPE Slingshot NICs.", len(p.CXIs))
 
 	devs := make([]*pluginapi.Device, len(p.CXIs))
+
+	func() {
+		i := 0
+		for _, id := range p.CXIs {
+			dev := &pluginapi.Device{
+				ID:     strconv.Itoa(id),
+				Health: pluginapi.Healthy,
+			}
+			devs[i] = dev
+			i++
+		}
+	}()
+
 	s.Send(&pluginapi.ListAndWatchResponse{Devices: devs})
 
 	loop:
 	for {
 		select {
 		case <-p.Heartbeat:
-			var health = pluginapi.Unhealthy
-
-			// TODO there are no per device health check currently
-			// TODO all devices on a node is used together by kfd
-			if simpleHealthCheck() {
-				health = pluginapi.Healthy
-			}
-
+			// var health = pluginapi.Unhealthy
+			
 			for i := 0; i < len(p.CXIs); i++ {
-				devs[i].Health = health
+				devs[i].Health = cxiSimpleHealthCheck(devs[i])
 			}
 			s.Send(&pluginapi.ListAndWatchResponse{Devices: devs})
 		case <-p.signal:
@@ -161,10 +169,7 @@ func (p *HPECXIPlugin) Allocate(ctx context.Context, r *pluginapi.AllocateReques
 		car = pluginapi.ContainerAllocateResponse{}
 
 		for _, id := range req.DevicesIDs {
-			glog.Infof("Allocating device ID: %d", id)
 
-			fmt.Println(id)
-			os.Exit(3)
 			for i := range p.CXIs[id] {
 				devpath := fmt.Sprintf("/dev/cxi%d", i)
 				dev = new(pluginapi.DeviceSpec)

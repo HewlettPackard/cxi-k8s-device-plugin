@@ -16,9 +16,7 @@ import (
 var gitDescribe string
 
 func main() {
-
-	fmt.Println("Starting HPE Slingshot device plugin for Kubernetes")
-
+	
 	versions := [...]string{
 		"HPE Slingshot device plugin for Kubernetes",
 		fmt.Sprintf("%s version %s", os.Args[0], gitDescribe),

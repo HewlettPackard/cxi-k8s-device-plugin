@@ -36,6 +36,10 @@ func GetHPECXIs() map[string]int {
 
 	}
 
+	for device, _ := range devices {
+		glog.Info("Found device ", device)
+	} 
+
 	return devices
 }
 
