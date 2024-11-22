@@ -18,6 +18,10 @@ var LibPaths = map[string]string{
 	"libcxiutils": "/usr/lib64/libcxiutils.so",
 }
 
+var EnvVars = map[string]string{
+	"LD_LIBRARY_PATH": "/opt/cray/lib64:/usr/lib64",
+}
+
 // GetHPECXIs return a map of HPE Cassini on a node identified by the part of the pci address
 func GetHPECXIs() map[string]int {
 	if _, err := os.Stat("/sys/module/cxi_core/drivers/"); err != nil {

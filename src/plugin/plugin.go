@@ -189,6 +189,7 @@ func (p *HPECXIPlugin) Allocate(ctx context.Context, r *pluginapi.AllocateReques
 		}
 
 	}
+	car.Envs = hpecxi.EnvVars
 	response.ContainerResponses = append(response.ContainerResponses, &car)
 
 	return &response, nil
