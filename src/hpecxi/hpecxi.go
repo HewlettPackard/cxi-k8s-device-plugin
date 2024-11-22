@@ -10,6 +10,8 @@ import (
 	"github.com/golang/glog"
 )
 
+const LibfabricPath string = "/opt/cray/lib64/"
+
 // GetHPECXIs return a map of HPE Cassini on a node identified by the part of the pci address
 func GetHPECXIs() map[string]int {
 	if _, err := os.Stat("/sys/module/cxi_core/drivers/"); err != nil {

@@ -133,8 +133,6 @@ func (p *HPECXIPlugin) ListAndWatch(e *pluginapi.Empty, s pluginapi.DevicePlugin
 	for {
 		select {
 		case <-p.Heartbeat:
-			// var health = pluginapi.Unhealthy
-			
 			for i := 0; i < len(p.CXIs); i++ {
 				devs[i].Health = cxiSimpleHealthCheck(devs[i])
 			}
@@ -164,20 +162,30 @@ func (p *HPECXIPlugin) Allocate(ctx context.Context, r *pluginapi.AllocateReques
 	var response pluginapi.AllocateResponse
 	var car pluginapi.ContainerAllocateResponse
 	var dev *pluginapi.DeviceSpec
+	var mount *pluginapi.Mount	
 
+	car = pluginapi.ContainerAllocateResponse{}
+	
+	// Load libfabric
+	glog.Infof("Mounting %s.", hpecxi.LibfabricPath)
+	mountPath := hpecxi.LibfabricPath
+	mount = new(pluginapi.Mount)
+	mount.HostPath = mountPath
+	mount.ContainerPath = mountPath
+	mount.ReadOnly = true
+	car.Mounts = append(car.Mounts, mount)
+	response.ContainerResponses = append(response.ContainerResponses, &car)
+	
 	for _, req := range r.ContainerRequests {
-		car = pluginapi.ContainerAllocateResponse{}
-
+		
 		for _, id := range req.DevicesIDs {
-
-			for i := range p.CXIs[id] {
-				devpath := fmt.Sprintf("/dev/cxi%d", i)
-				dev = new(pluginapi.DeviceSpec)
-				dev.HostPath = devpath
-				dev.ContainerPath = devpath
-				dev.Permissions = "rw"
-				car.Devices = append(car.Devices, dev)
-			}
+			glog.Infof("Allocating cxi%s.", id)
+			devPath := fmt.Sprintf("/dev/cxi%s", id)
+			dev = new(pluginapi.DeviceSpec)
+			dev.HostPath = devPath
+			dev.ContainerPath = devPath
+			dev.Permissions = "rw"
+			car.Devices = append(car.Devices, dev)
 
 		}
 
