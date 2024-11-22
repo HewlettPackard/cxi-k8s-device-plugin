@@ -10,7 +10,13 @@ import (
 	"github.com/golang/glog"
 )
 
-const LibfabricPath string = "/opt/cray/lib64/"
+const HPEvendorID string = "0x17db"
+
+var LibPaths = map[string]string{
+	"libfabric":   "/opt/cray/lib64",
+	"libcxi":      "/usr/lib64/libcxi.so",
+	"libcxiutils": "/usr/lib64/libcxiutils.so",
+}
 
 // GetHPECXIs return a map of HPE Cassini on a node identified by the part of the pci address
 func GetHPECXIs() map[string]int {
@@ -19,7 +25,6 @@ func GetHPECXIs() map[string]int {
 		return make(map[string]int)
 	}
 
-	//ex: /sys/module/amdgpu/cxi_core/pci:cxi_core/0000:19:00.0
 	matches, _ := filepath.Glob("/sys/module/cxi_core/drivers/pci:cxi_core/[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]:*")
 
 	devices := make(map[string]int)
@@ -40,7 +45,7 @@ func GetHPECXIs() map[string]int {
 
 	for device, _ := range devices {
 		glog.Info("Found device ", device)
-	} 
+	}
 
 	return devices
 }
@@ -52,8 +57,7 @@ func HPECXI(cardName string) bool {
 	if err == nil {
 		vid := strings.TrimSpace(string(b))
 
-		// HPE vendor ID is 0x17db
-		if "0x17db" == vid {
+		if vid == HPEvendorID {
 			return true
 		}
 	} else {

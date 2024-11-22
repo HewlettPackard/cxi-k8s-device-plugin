@@ -8,7 +8,6 @@ import (
 
 	"cxi-k8s-device-plugin/src/plugin"
 
-
 	"github.com/golang/glog"
 	"github.com/kubevirt/device-plugin-manager/pkg/dpm"
 )
@@ -16,7 +15,7 @@ import (
 var gitDescribe string
 
 func main() {
-	
+
 	versions := [...]string{
 		"HPE Slingshot device plugin for Kubernetes",
 		fmt.Sprintf("%s version %s", os.Args[0], gitDescribe),

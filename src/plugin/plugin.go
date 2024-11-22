@@ -6,8 +6,8 @@ import (
 	"os/signal"
 	"path/filepath"
 	"regexp"
-	"syscall"
 	"strconv"
+	"syscall"
 
 	"cxi-k8s-device-plugin/src/hpecxi"
 
@@ -111,7 +111,7 @@ func (p *HPECXIPlugin) PreStartContainer(ctx context.Context, r *pluginapi.PreSt
 func (p *HPECXIPlugin) ListAndWatch(e *pluginapi.Empty, s pluginapi.DevicePlugin_ListAndWatchServer) error {
 	p.CXIs = hpecxi.GetHPECXIs()
 
-	glog.Infof("Found %d HPE Slingshot NICs.", len(p.CXIs))
+	glog.Infof("Found %d HPE Slingshot NICs", len(p.CXIs))
 
 	devs := make([]*pluginapi.Device, len(p.CXIs))
 
@@ -129,7 +129,7 @@ func (p *HPECXIPlugin) ListAndWatch(e *pluginapi.Empty, s pluginapi.DevicePlugin
 
 	s.Send(&pluginapi.ListAndWatchResponse{Devices: devs})
 
-	loop:
+loop:
 	for {
 		select {
 		case <-p.Heartbeat:
@@ -162,35 +162,34 @@ func (p *HPECXIPlugin) Allocate(ctx context.Context, r *pluginapi.AllocateReques
 	var response pluginapi.AllocateResponse
 	var car pluginapi.ContainerAllocateResponse
 	var dev *pluginapi.DeviceSpec
-	var mount *pluginapi.Mount	
+	var mount *pluginapi.Mount
 
 	car = pluginapi.ContainerAllocateResponse{}
-	
-	// Load libfabric
-	glog.Infof("Mounting %s.", hpecxi.LibfabricPath)
-	mountPath := hpecxi.LibfabricPath
-	mount = new(pluginapi.Mount)
-	mount.HostPath = mountPath
-	mount.ContainerPath = mountPath
-	mount.ReadOnly = true
-	car.Mounts = append(car.Mounts, mount)
-	response.ContainerResponses = append(response.ContainerResponses, &car)
-	
+
+	for libname, libpath := range hpecxi.LibPaths {
+		glog.Infof("Mounting %s", libname)
+		mountPath := libpath
+		mount = new(pluginapi.Mount)
+		mount.HostPath = mountPath
+		mount.ContainerPath = mountPath
+		mount.ReadOnly = true
+		car.Mounts = append(car.Mounts, mount)
+	}
+
 	for _, req := range r.ContainerRequests {
-		
+
 		for _, id := range req.DevicesIDs {
-			glog.Infof("Allocating cxi%s.", id)
+			glog.Infof("Allocating cxi%s", id)
 			devPath := fmt.Sprintf("/dev/cxi%s", id)
 			dev = new(pluginapi.DeviceSpec)
 			dev.HostPath = devPath
 			dev.ContainerPath = devPath
 			dev.Permissions = "rw"
 			car.Devices = append(car.Devices, dev)
-
 		}
 
-		response.ContainerResponses = append(response.ContainerResponses, &car)
 	}
+	response.ContainerResponses = append(response.ContainerResponses, &car)
 
 	return &response, nil
 }
