@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"syscall"
 
-	"cxi-k8s-device-plugin/src/hpecxi"
+	"github.hpe.com/caio-davi/cxi-k8s-device-plugin/src/hpecxi"
 
 	"github.com/golang/glog"
 	"github.com/kubevirt/device-plugin-manager/pkg/dpm"
