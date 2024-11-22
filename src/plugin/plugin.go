@@ -110,7 +110,6 @@ func (p *HPECXIPlugin) PreStartContainer(ctx context.Context, r *pluginapi.PreSt
 // returns the new list
 func (p *HPECXIPlugin) ListAndWatch(e *pluginapi.Empty, s pluginapi.DevicePlugin_ListAndWatchServer) error {
 	p.CXIs = hpecxi.GetHPECXIs()
-
 	glog.Infof("Found %d HPE Slingshot NICs", len(p.CXIs))
 
 	devs := make([]*pluginapi.Device, len(p.CXIs))
@@ -165,9 +164,10 @@ func (p *HPECXIPlugin) Allocate(ctx context.Context, r *pluginapi.AllocateReques
 	var mount *pluginapi.Mount
 
 	car = pluginapi.ContainerAllocateResponse{}
+	libpaths, _ := hpecxi.GetLibs() 
 
-	for libname, libpath := range hpecxi.LibPaths {
-		glog.Infof("Mounting %s", libname)
+	for _, libpath := range libpaths {
+		glog.Infof("Mounting %s", libpath)
 		mountPath := libpath
 		mount = new(pluginapi.Mount)
 		mount.HostPath = mountPath
