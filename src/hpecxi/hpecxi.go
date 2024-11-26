@@ -99,6 +99,8 @@ func HPECXI(cardName string) bool {
 
 		if vid == HPEvendorID {
 			return true
+		}else{
+			glog.Infof("%s is not a HPE NIC.", cardName)
 		}
 	} else {
 		glog.Errorf("Error opening %s: %s", sysfsVendorPath, err)
