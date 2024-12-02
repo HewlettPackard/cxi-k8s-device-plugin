@@ -1,7 +1,6 @@
 package hpecxi
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -12,6 +11,7 @@ import (
 
 const HPEvendorID string = "0x17db"
 
+// In the future, we may want to include lib paths into the helm.
 var LibPaths = map[string]string{
 	"libfabric":   "/opt/cray/lib64",
 	"libcxi":      "/usr/lib64",
@@ -23,25 +23,25 @@ var EnvVars = map[string]string{
 }
 
 func findLibs(libName, libPath string) ([]string, error) {
-    var files []string
+	var files []string
 
-	fileInfos, err := ioutil.ReadDir(libPath)
+	fileInfos, err := os.ReadDir(libPath)
 	if err != nil {
-        glog.Errorf("Error while looking for %s in %s",libName, libPath)
-        return nil, err
-    }
+		glog.Errorf("Error while looking for %s in %s", libName, libPath)
+		return nil, err
+	}
 	notFound := true
-    for _, fileInfo := range fileInfos {
-        if strings.HasPrefix(fileInfo.Name(), libName) {
-            fullPath := filepath.Join(libPath, fileInfo.Name())
-            files = append(files, fullPath)
+	for _, fileInfo := range fileInfos {
+		if strings.HasPrefix(fileInfo.Name(), libName) {
+			fullPath := filepath.Join(libPath, fileInfo.Name())
+			files = append(files, fullPath)
 			notFound = false
-        }
-    }
-	if notFound{
+		}
+	}
+	if notFound {
 		glog.Infof("Library %s not found at %s", libName, libPath)
 	}
-    return files, nil
+	return files, nil
 }
 
 func GetLibs() ([]string, error) {
@@ -59,6 +59,7 @@ func GetLibs() ([]string, error) {
 }
 
 // GetHPECXIs return a map of HPE Cassini on a node identified by the part of the pci address
+// This may be changed to use cxilib calls instead of sysfs.
 func GetHPECXIs() map[string]int {
 	if _, err := os.Stat("/sys/module/cxi_core/drivers/"); err != nil {
 		glog.Warningf("HPE CXI driver unavailable: %s", err)
@@ -93,13 +94,13 @@ func GetHPECXIs() map[string]int {
 // HPECXI check if a particular card is a HPE CXI NIC by checking the device's vendor ID
 func HPECXI(cardName string) bool {
 	sysfsVendorPath := "/sys/class/cxi/" + cardName + "/device/vendor"
-	b, err := ioutil.ReadFile(sysfsVendorPath)
+	b, err := os.ReadFile(sysfsVendorPath)
 	if err == nil {
 		vid := strings.TrimSpace(string(b))
 
 		if vid == HPEvendorID {
 			return true
-		}else{
+		} else {
 			glog.Infof("%s is not a HPE NIC.", cardName)
 		}
 	} else {

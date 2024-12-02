@@ -1,13 +1,12 @@
 package hpecxi_test
 
 import (
-	"io/ioutil"
-	"path/filepath"
-    "strings"
-    "testing"
 	"os"
+	"path/filepath"
+	"strings"
+	"testing"
 
-    "github.hpe.com/caio-davi/cxi-k8s-device-plugin/src/hpecxi"
+	"github.hpe.com/caio-davi/cxi-k8s-device-plugin/src/hpecxi"
 )
 
 func hasHPECXI(t *testing.T) bool {
@@ -30,7 +29,7 @@ func TestCXIDeviceCountConsistent(t *testing.T) {
 	count := 0
 	for _, vidPath := range matches {
 		t.Log(vidPath)
-		b, err := ioutil.ReadFile(vidPath)
+		b, err := os.ReadFile(vidPath)
 		vid := string(b)
 
 		if err == nil && hpecxi.HPEvendorID == strings.TrimSpace(vid) {
@@ -48,12 +47,12 @@ func TestCXIDeviceCountConsistent(t *testing.T) {
 }
 
 func TestLibs(t *testing.T) {
-	libpaths, err := hpecxi.GetLibs() 
+	libpaths, err := hpecxi.GetLibs()
 	if err != nil {
 		t.Error(err)
-		}
+	}
 	for _, libpath := range libpaths {
-    // Check if the file exists
+		// Check if the file exists
 		if _, err := os.Stat(libpath); os.IsNotExist(err) {
 			t.Errorf("File does not exist: %s", libpath)
 		} else if err != nil {
