@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: hpecxi-device-plugin-daemonset
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      name: hpecxi-dp-ds
+  template:
+    metadata:
+      labels:
+        name: hpecxi-dp-ds
+    spec:
+      priorityClassName: system-node-critical
+      tolerations:
+      - key: CriticalAddonsOnly
+        operator: Exists
+      containers:
+      - image: hub.docker.hpecorp.net/caio.davi/cxi-k8s-device-plugin:0.1
+        name: hpecxi-dp-cntr
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+        volumeMounts:
+          - name: dp
+            mountPath: /var/lib/kubelet/device-plugins
+          - name: sys
+            mountPath: /sys
+      volumes:
+        - name: dp
+          hostPath:
+            path: /var/lib/kubelet/device-plugins
+        - name: sys
+          hostPath:
+            path: /sys
