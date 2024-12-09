@@ -42,7 +42,6 @@ type HPECXILister struct {
 // to Kubernetes.
 func (p *HPECXIPlugin) Start() error {
 	p.signal = make(chan os.Signal, 1)
-	// Create cxi_service here
 	signal.Notify(p.signal, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
 
 	return nil
@@ -53,7 +52,6 @@ func (p *HPECXIPlugin) Start() error {
 // plugin is unregistered from kubelet. This method could be used to tear
 // down resources.
 func (p *HPECXIPlugin) Stop() error {
-	// Delete cxi_service here
 	return nil
 }
 
