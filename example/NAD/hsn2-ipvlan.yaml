@@ -1,0 +1,15 @@
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: hsn2-ipvlan
+spec:
+  config: '{
+    "cniVersion": "0.3.1",
+    "type": "ipvlan",
+    "master": "hsn2",
+    "mode": "l3",
+    "ipam": {
+        "type": "whereabouts",
+        "range": "10.150.12.1/28"
+      }
+  }'

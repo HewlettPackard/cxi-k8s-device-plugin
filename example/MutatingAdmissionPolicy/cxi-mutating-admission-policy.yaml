@@ -1,0 +1,32 @@
+apiVersion: admissionregistration.k8s.io/v1alpha1
+kind: MutatingAdmissionPolicy
+metadata:
+  name: cxi-mutating-admission-policy
+spec:
+  matchConstraints:
+    resourceRules:
+    - apiGroups:   ["", "apps"]
+      apiVersions: ["v1"]
+      operations:  ["CREATE", "UPDATE"]
+      resources:   ["pods"]
+  matchConditions:
+    - name: has-beta-hpe-com-cxi-request
+      expression: "object.spec.containers.exists(c, c.resources.requests.exists(req, req == 'beta.hpe.com/cxi'))"
+  failurePolicy: Ignore
+  reinvocationPolicy: IfNeeded
+  mutations:
+    - patchType: "JSONPatch"
+      jsonPatch:
+        expression: >
+          [
+            JSONPatch{
+              op : "add",
+              path : "/metadata/annotations",
+              value : {}
+            },
+            JSONPatch{
+              op : "add",
+              path : "/metadata/annotations/k8s.v1.cni.cncf.io~1networks",
+              value : "[{\"name\": \"hsn0-ipvlan\",\"interface\": \"hsn0\"},{\"name\": \"hsn1-ipvlan\",\"interface\": \"hsn1\"},{\"name\": \"hsn2-ipvlan\",\"interface\": \"hsn2\"},{\"name\": \"hsn3-ipvlan\",\"interface\": \"hsn3\"}]"
+            }
+          ]

@@ -1,0 +1,7 @@
+apiVersion: admissionregistration.k8s.io/v1alpha1
+kind: MutatingAdmissionPolicyBinding
+metadata:
+  name: cxi-mutating-admission-policy-binding
+spec:
+  policyName: cxi-mutating-admission-policy
+  matchResources: {}

@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: cxi-test
+spec:
+  containers:
+    - name: cxi-test-container
+      image: nicolaka/netshoot
+      command:
+        - sleep
+        - "3600"
+      resources:
+        requests:
+          beta.hpe.com/cxi: 4 # requesting four NIC
+        limits:
+          beta.hpe.com/cxi: 4 # requesting four NIC
