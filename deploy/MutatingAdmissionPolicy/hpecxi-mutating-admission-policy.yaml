@@ -1,7 +1,7 @@
 apiVersion: admissionregistration.k8s.io/v1alpha1
 kind: MutatingAdmissionPolicy
 metadata:
-  name: cxi-mutating-admission-policy
+  name: hpecxi-mutating-admission-policy
 spec:
   matchConstraints:
     resourceRules:
@@ -10,7 +10,7 @@ spec:
       operations:  ["CREATE", "UPDATE"]
       resources:   ["pods"]
   matchConditions:
-    - name: has-beta-hpe-com-cxi-request
+    - name: has-beta-hpe-com-hpecxi-request
       expression: "object.spec.containers.exists(c, c.resources.requests.exists(req, req == 'beta.hpe.com/cxi'))"
   failurePolicy: Ignore
   reinvocationPolicy: IfNeeded
