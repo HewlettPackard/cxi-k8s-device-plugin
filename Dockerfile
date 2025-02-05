@@ -4,8 +4,9 @@ RUN apk --no-cache add git pkgconfig build-base libdrm-dev
 RUN mkdir -p /go/src/github.com/HPE/cxi-k8s-device-plugin
 ADD . /go/src/github.com/HPE/cxi-k8s-device-plugin
 WORKDIR /go/src/github.com/HPE/cxi-k8s-device-plugin
-# RUN go install -ldflags="-X main.gitDescribe=$(git -C /go/src/github.com/HPE/cxi-k8s-device-plugin describe --always --long --dirty)"
-RUN go build src/main.go
+RUN go build \
+    -ldflags="-X main.version=$(git describe --always --long --dirty)" \
+    src/main.go
 RUN mv main cxi-k8s-device-plugin
 RUN cp cxi-k8s-device-plugin /go/bin/
 

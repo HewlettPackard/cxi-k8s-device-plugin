@@ -12,13 +12,13 @@ import (
 	"github.com/kubevirt/device-plugin-manager/pkg/dpm"
 )
 
-var gitDescribe string
+var version string
 
 func main() {
 
 	versions := [...]string{
 		"HPE Slingshot device plugin for Kubernetes",
-		fmt.Sprintf("%s version %s", os.Args[0], gitDescribe),
+		fmt.Sprintf("%s version %s", os.Args[0], version),
 	}
 
 	flag.Usage = func() {
