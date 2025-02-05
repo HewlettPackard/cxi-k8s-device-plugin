@@ -7,7 +7,7 @@ spec:
     "cniVersion": "0.3.1",
     "type": "ipvlan",
     "master": "hsn2",
-    "mode": "l3",
+    "mode": "l2",
     "ipam": {
         "type": "whereabouts",
         "range": "10.150.12.1/28"
