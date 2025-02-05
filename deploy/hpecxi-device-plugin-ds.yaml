@@ -28,6 +28,10 @@ spec:
             mountPath: /var/lib/kubelet/device-plugins
           - name: sys
             mountPath: /sys
+          - name: cray
+            mountPath: /opt/cray
+          - name: libfabric
+            mountPath: /usr/lib64
       volumes:
         - name: dp
           hostPath:
@@ -35,3 +39,9 @@ spec:
         - name: sys
           hostPath:
             path: /sys
+        - name: cray
+          hostPath:
+            path: /opt/cray
+        - name: libfabric
+          hostPath:
+            path: /usr/lib64
