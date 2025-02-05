@@ -162,7 +162,11 @@ func (p *HPECXIPlugin) Allocate(ctx context.Context, r *pluginapi.AllocateReques
 	var mount *pluginapi.Mount
 
 	car = pluginapi.ContainerAllocateResponse{}
-	libpaths, _ := hpecxi.GetLibs()
+	libpaths, err := hpecxi.GetLibs()
+
+	if err != nil {
+		return nil, err
+	}
 
 	for _, libpath := range libpaths {
 		glog.Infof("Mounting %s", libpath)
