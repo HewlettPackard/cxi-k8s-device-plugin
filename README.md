@@ -41,12 +41,7 @@ kubectl apply \
     -f doc/crds/whereabouts.cni.cncf.io_ippools.yaml \
     -f doc/crds/whereabouts.cni.cncf.io_overlappingrangeipreservations.yaml
 ```
-<!-- ##### Network Attachment Definitions
 
-We need to create Custom Resource Definitions (CRDs) describing the configurations for each of the additional interfaces that we want to attach to the pods.
-```
-kubectl apply -f ./deploy/NAD
-``` -->
 ## Deployment
 
 Alpha-version image available at `hub.docker.hpecorp.net/caio.davi/cxi-k8s-device-plugin:0.1`. 
@@ -59,4 +54,4 @@ kubectl apply \
     -f ./deploy/hpecxi-device-plugin-ds.yaml
 ```
 
-> Image only available at `hub.docker.hpecorp.net` for now. Make sure to login prior to run the command. 
+> #### Make sure the IPAM definitions in the `./deploy/NetworkAttachmentDefinition` are follwoing your cluster network requirements. 
