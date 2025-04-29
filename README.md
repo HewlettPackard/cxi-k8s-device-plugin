@@ -12,7 +12,7 @@ This is a device plugin implementation that enables the registration of HPE Slin
 
 This step must be executed for every node and every Slingshot NIC that servers the Kubernetes cluster:
 ```
-cxi_service enable -d hsnX -s 1
+cxi_service enable -d cxiX -s 1
 ```
 
 ##### - Enable Mutating Admission Policy
