@@ -1,4 +1,4 @@
-module github.hpe.com/caio-davi/cxi-k8s-device-plugin
+module github.com/HewlettPackard/cxi-k8s-device-plugin
 
 go 1.23.1
 

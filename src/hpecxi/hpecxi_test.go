@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.hpe.com/caio-davi/cxi-k8s-device-plugin/src/hpecxi"
+	"github.com/HewlettPackard/cxi-k8s-device-plugin/src/hpecxi"
 )
 
 func hasHPECXI(t *testing.T) bool {
