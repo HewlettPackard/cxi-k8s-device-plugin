@@ -1,16 +1,14 @@
-package hpecxi_test
+package hpecxi
 
 import (
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/HewlettPackard/cxi-k8s-device-plugin/src/hpecxi"
 )
 
 func hasHPECXI(t *testing.T) bool {
-	devices := hpecxi.GetHPECXIs()
+	devices := GetHPECXIs()
 	if len(devices) <= 0 {
 		return false
 	}
@@ -22,7 +20,7 @@ func TestCXIDeviceCountConsistent(t *testing.T) {
 		t.Skip("Skipping test, no HPE CXI found.")
 	}
 
-	devices := hpecxi.GetHPECXIs()
+	devices := GetHPECXIs()
 
 	matches, _ := filepath.Glob("/sys/class/cxi/cxi[0-3]*/device/vendor")
 
@@ -32,7 +30,7 @@ func TestCXIDeviceCountConsistent(t *testing.T) {
 		b, err := os.ReadFile(vidPath)
 		vid := string(b)
 
-		if err == nil && hpecxi.HPEvendorID == strings.TrimSpace(vid) {
+		if err == nil && HPEvendorID == strings.TrimSpace(vid) {
 			count++
 		} else {
 			t.Log(vid)
@@ -47,7 +45,7 @@ func TestCXIDeviceCountConsistent(t *testing.T) {
 }
 
 func TestLibs(t *testing.T) {
-	libpaths, err := hpecxi.GetLibs()
+	libpaths, err := GetLibs()
 	if err != nil {
 		t.Error(err)
 	}

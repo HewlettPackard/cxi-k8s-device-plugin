@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/HewlettPackard/cxi-k8s-device-plugin/src/plugin"
+	"github.com/HewlettPackard/cxi-k8s-device-plugin/pkg/plugin"
 
 	"github.com/golang/glog"
 	"github.com/kubevirt/device-plugin-manager/pkg/dpm"
