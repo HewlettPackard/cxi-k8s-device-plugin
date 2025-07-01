@@ -11,9 +11,9 @@ import (
 
 	"github.com/HewlettPackard/cxi-k8s-device-plugin/pkg/hpecxi"
 
-	"github.com/golang/glog"
 	"github.com/kubevirt/device-plugin-manager/pkg/dpm"
 	"golang.org/x/net/context"
+	"k8s.io/klog/v2"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 )
 
@@ -67,7 +67,7 @@ func countCXIFromTopology(topoRootParam ...string) int {
 	var nodeFiles []string
 	var err error
 	if nodeFiles, err = filepath.Glob(topoRoot); err != nil {
-		glog.Fatalf("glob error: %s", err)
+		klog.Fatalf("glob error: %s", err)
 		return count
 	}
 
@@ -83,7 +83,7 @@ func cxiSimpleHealthCheck(device *pluginapi.Device) string {
 	var cxi *os.File
 	var err error
 	if cxi, err = os.Open("/dev/cxi" + device.ID); err != nil {
-		glog.Error("Error opening /dev/cxi" + device.ID)
+		klog.Error("Error opening /dev/cxi" + device.ID)
 		return pluginapi.Unhealthy
 	}
 	cxi.Close()
@@ -108,7 +108,7 @@ func (p *HPECXIPlugin) PreStartContainer(ctx context.Context, r *pluginapi.PreSt
 // returns the new list
 func (p *HPECXIPlugin) ListAndWatch(e *pluginapi.Empty, s pluginapi.DevicePlugin_ListAndWatchServer) error {
 	p.CXIs = hpecxi.GetHPECXIs()
-	glog.Infof("Found %d HPE Slingshot NICs", len(p.CXIs))
+	klog.Infof("Found %d HPE Slingshot NICs", len(p.CXIs))
 
 	devs := make([]*pluginapi.Device, len(p.CXIs))
 
@@ -135,7 +135,7 @@ loop:
 			}
 			s.Send(&pluginapi.ListAndWatchResponse{Devices: devs})
 		case <-p.signal:
-			glog.Infof("Received signal, exiting")
+			klog.Infof("Received signal, exiting")
 			break loop
 		}
 	}
@@ -169,7 +169,7 @@ func (p *HPECXIPlugin) Allocate(ctx context.Context, r *pluginapi.AllocateReques
 	}
 
 	for _, libpath := range libpaths {
-		glog.Infof("Mounting %s", libpath)
+		klog.Infof("Mounting %s", libpath)
 		mountPath := libpath
 		mount = new(pluginapi.Mount)
 		mount.HostPath = mountPath
@@ -181,7 +181,7 @@ func (p *HPECXIPlugin) Allocate(ctx context.Context, r *pluginapi.AllocateReques
 	for _, req := range r.ContainerRequests {
 
 		for _, id := range req.DevicesIDs {
-			glog.Infof("Allocating cxi%s", id)
+			klog.Infof("Allocating cxi%s", id)
 			devPath := fmt.Sprintf("/dev/cxi%s", id)
 			dev = new(pluginapi.DeviceSpec)
 			dev.HostPath = devPath

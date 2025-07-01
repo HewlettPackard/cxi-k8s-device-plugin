@@ -8,8 +8,8 @@ import (
 
 	"github.com/HewlettPackard/cxi-k8s-device-plugin/pkg/plugin"
 
-	"github.com/golang/glog"
 	"github.com/kubevirt/device-plugin-manager/pkg/dpm"
+	"k8s.io/klog/v2"
 )
 
 var version string
@@ -30,11 +30,10 @@ func main() {
 	}
 	var pulse int
 	flag.IntVar(&pulse, "pulse", 0, "time between health check polling in seconds.  Set to 0 to disable.")
-	// this is also needed to enable glog usage in dpm
 	flag.Parse()
 
 	for _, v := range versions {
-		glog.Infof("%s", v)
+		klog.Infof("%s", v)
 	}
 
 	l := plugin.HPECXILister{
@@ -45,7 +44,7 @@ func main() {
 
 	if pulse > 0 {
 		go func() {
-			glog.Infof("Heart beating every %d seconds", pulse)
+			klog.Infof("Heart beating every %d seconds", pulse)
 			for {
 				time.Sleep(time.Second * time.Duration(pulse))
 				l.Heartbeat <- true
