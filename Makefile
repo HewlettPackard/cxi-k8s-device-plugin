@@ -8,6 +8,7 @@ endif
 
 .PHONY: build
 build: $(SOURCES)
+	make tidy
 	mkdir -p bin/
 	go build -o bin/cxi-k8s-device-plugin -ldflags "-X main.version=$(VERSION)" ./cmd
 	@echo "Built. Version: $(VERSION)"
