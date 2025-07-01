@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/golang/glog"
+	"k8s.io/klog/v2"
 )
 
 const HPEvendorID string = "0x17db"
@@ -27,7 +27,7 @@ func findLibs(libName, libPath string) ([]string, error) {
 
 	fileInfos, err := os.ReadDir(libPath)
 	if err != nil {
-		glog.Errorf("Error while looking for %s in %s", libName, libPath)
+		klog.Errorf("Error while looking for %s in %s", libName, libPath)
 		return nil, err
 	}
 	notFound := true
@@ -39,7 +39,7 @@ func findLibs(libName, libPath string) ([]string, error) {
 		}
 	}
 	if notFound {
-		glog.Infof("Library %s not found at %s", libName, libPath)
+		klog.Infof("Library %s not found at %s", libName, libPath)
 	}
 	return files, nil
 }
@@ -62,7 +62,7 @@ func GetLibs() ([]string, error) {
 // This may be changed to use cxilib calls instead of sysfs.
 func GetHPECXIs() map[string]int {
 	if _, err := os.Stat("/sys/module/cxi_core/drivers/"); err != nil {
-		glog.Warningf("HPE CXI driver unavailable: %s", err)
+		klog.Warningf("HPE CXI driver unavailable: %s", err)
 		return make(map[string]int)
 	}
 
@@ -71,7 +71,7 @@ func GetHPECXIs() map[string]int {
 	devices := make(map[string]int)
 
 	for _, path := range matches {
-		glog.Info(path)
+		klog.Info(path)
 		devPaths, _ := filepath.Glob(path + "/net/*")
 
 		for _, devPath := range devPaths {
@@ -85,7 +85,7 @@ func GetHPECXIs() map[string]int {
 	}
 
 	for device, _ := range devices {
-		glog.Info("Found device ", device)
+		klog.Info("Found device ", device)
 	}
 
 	return devices
@@ -101,10 +101,10 @@ func HPECXI(cardName string) bool {
 		if vid == HPEvendorID {
 			return true
 		} else {
-			glog.Infof("%s is not a HPE NIC.", cardName)
+			klog.Infof("%s is not a HPE NIC.", cardName)
 		}
 	} else {
-		glog.Errorf("Error opening %s: %s", sysfsVendorPath, err)
+		klog.Errorf("Error opening %s: %s", sysfsVendorPath, err)
 	}
 	return false
 }

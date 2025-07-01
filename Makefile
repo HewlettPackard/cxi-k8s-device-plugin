@@ -25,3 +25,10 @@ clean:
 run: clean 
 	make build
 	./bin/cxi-k8s-device-plugin -logtostderr=true -stderrthreshold=INFO -v=5
+
+.PHONY: test
+test: tidy
+	@echo "Running tests..."
+	@echo "Version: $(VERSION)"
+	@echo "Running unit tests..."
+	go test -v ./pkg/...
