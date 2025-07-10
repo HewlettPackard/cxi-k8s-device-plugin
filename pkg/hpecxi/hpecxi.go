@@ -9,7 +9,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
-const HPEvendorID string = "0x17db"
+// const HPEvendorID string = "0x17db"
 
 // In the future, we may want to include lib paths into the helm.
 var LibPaths = map[string]string{
@@ -92,19 +92,19 @@ func GetHPECXIs() map[string]int {
 }
 
 // HPECXI check if a particular card is a HPE CXI NIC by checking the device's vendor ID
-func HPECXI(cardName string) bool {
-	sysfsVendorPath := "/sys/class/cxi/" + cardName + "/device/vendor"
-	b, err := os.ReadFile(sysfsVendorPath)
-	if err == nil {
-		vid := strings.TrimSpace(string(b))
+// func HPECXI(cardName string) bool {
+// 	sysfsVendorPath := "/sys/class/cxi/" + cardName + "/device/vendor"
+// 	b, err := os.ReadFile(sysfsVendorPath)
+// 	if err == nil {
+// 		vid := strings.TrimSpace(string(b))
 
-		if vid == HPEvendorID {
-			return true
-		} else {
-			klog.Infof("%s is not a HPE NIC.", cardName)
-		}
-	} else {
-		klog.Errorf("Error opening %s: %s", sysfsVendorPath, err)
-	}
-	return false
-}
+// 		if vid == HPEvendorID {
+// 			return true
+// 		} else {
+// 			klog.Infof("%s is not a HPE NIC.", cardName)
+// 		}
+// 	} else {
+// 		klog.Errorf("Error opening %s: %s", sysfsVendorPath, err)
+// 	}
+// 	return false
+// }
