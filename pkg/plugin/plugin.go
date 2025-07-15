@@ -107,20 +107,23 @@ func (p *HPECXIPlugin) PreStartContainer(ctx context.Context, r *pluginapi.PreSt
 // Whenever a Device state change or a Device disappears, ListAndWatch
 // returns the new list
 func (p *HPECXIPlugin) ListAndWatch(e *pluginapi.Empty, s pluginapi.DevicePlugin_ListAndWatchServer) error {
-	p.CXIs = hpecxi.GetHPECXIs()
+	if p.CXIs == nil {
+		p.CXIs = make(map[string]int)
+	}
+	var devicesList = hpecxi.DiscoverDevices()
+	for _, device := range devicesList {
+		klog.Infof("Discovered device:  %s", device.Name)
+		p.CXIs[device.Name] = int(device.DeviceId)
+	}
 	klog.Infof("Found %d HPE Slingshot NICs", len(p.CXIs))
-
 	devs := make([]*pluginapi.Device, len(p.CXIs))
-
 	func() {
-		i := 0
 		for _, id := range p.CXIs {
 			dev := &pluginapi.Device{
 				ID:     strconv.Itoa(id),
 				Health: pluginapi.Healthy,
 			}
-			devs[i] = dev
-			i++
+			devs[id] = dev
 		}
 	}()
 
@@ -132,6 +135,7 @@ loop:
 		case <-p.Heartbeat:
 			for i := 0; i < len(p.CXIs); i++ {
 				devs[i].Health = cxiSimpleHealthCheck(devs[i])
+				klog.Infof("[Health Check] cxi%d: %s", i, devs[i].Health)
 			}
 			s.Send(&pluginapi.ListAndWatchResponse{Devices: devs})
 		case <-p.signal:
