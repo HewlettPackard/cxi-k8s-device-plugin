@@ -4,8 +4,10 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path"
 	"time"
 
+	"github.com/HewlettPackard/cxi-k8s-device-plugin/pkg/hpecxi"
 	"github.com/HewlettPackard/cxi-k8s-device-plugin/pkg/plugin"
 
 	"github.com/kubevirt/device-plugin-manager/pkg/dpm"
@@ -55,7 +57,7 @@ func main() {
 	go func() {
 		// Check if there are Cassini NICs installed
 		// TODO: check how many and update channel.
-		var path = "/sys/class/cxi"
+		var path = path.Join(hpecxi.GetSysfsRoot(hpecxi.Sysfspath), hpecxi.Sysfspath)
 		if _, err := os.Stat(path); err == nil {
 			l.ResUpdateChan <- []string{"cxi"}
 		}
