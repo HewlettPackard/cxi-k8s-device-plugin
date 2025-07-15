@@ -10,8 +10,8 @@ endif
 build: $(SOURCES)
 	make tidy
 	mkdir -p bin/
-	go build -o bin/cxi-k8s-device-plugin -ldflags "-X main.version=$(VERSION)" ./cmd/device_plugin.go
-	go build -o bin/cxi-cdi-generator -ldflags "-X main.version=$(VERSION)" ./cmd/cxi_cdi.go
+	go build -o bin/cxi-k8s-device-plugin -ldflags "-X main.version=$(VERSION)" ./cmd/device-plugin/main.go
+	go build -o bin/cxi-cdi-generator -ldflags "-X main.version=$(VERSION)" ./cmd/cxi-cdi/main.go
 	@echo "Built. Version: $(VERSION)"
 
 tidy:
