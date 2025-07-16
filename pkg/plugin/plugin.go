@@ -33,6 +33,7 @@ type HPECXILister struct {
 	ResUpdateChan chan dpm.PluginNameList
 	Heartbeat     chan bool
 	Signal        chan os.Signal
+	CDI           string
 }
 
 // Start is an optional interface that could be implemented by plugin.
