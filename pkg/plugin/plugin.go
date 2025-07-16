@@ -9,6 +9,9 @@ import (
 	"strconv"
 	"syscall"
 
+	"tags.cncf.io/container-device-interface/specs-go"
+
+	cxicdi "github.com/HewlettPackard/cxi-k8s-device-plugin/pkg/cxi-cdi"
 	"github.com/HewlettPackard/cxi-k8s-device-plugin/pkg/hpecxi"
 
 	"github.com/kubevirt/device-plugin-manager/pkg/dpm"
@@ -21,9 +24,12 @@ const resourceNamespace string = "beta.hpe.com"
 
 // Plugin is identical to DevicePluginServer interface of device plugin API.
 type HPECXIPlugin struct {
-	CXIs      map[string]int
-	Heartbeat chan bool
-	signal    chan os.Signal
+	CXIs       map[string]int
+	Heartbeat  chan bool
+	signal     chan os.Signal
+	CDIEnabled bool
+	CDIPath    string
+	CDI        specs.Spec
 }
 
 // Lister serves as an interface between imlementation and Manager machinery. User passes
@@ -33,7 +39,16 @@ type HPECXILister struct {
 	ResUpdateChan chan dpm.PluginNameList
 	Heartbeat     chan bool
 	Signal        chan os.Signal
-	CDI           string
+	CDIEnabled    bool
+	CDIPath       string
+}
+
+func (l *HPECXILister) NewPlugin(resourceLastName string) dpm.PluginInterface {
+	return &HPECXIPlugin{
+		Heartbeat:  l.Heartbeat,
+		CDIPath:    l.CDIPath,
+		CDIEnabled: l.CDIEnabled,
+	}
 }
 
 // Start is an optional interface that could be implemented by plugin.
@@ -43,6 +58,9 @@ type HPECXILister struct {
 // to Kubernetes.
 func (p *HPECXIPlugin) Start() error {
 	p.signal = make(chan os.Signal, 1)
+	if p.CDIEnabled {
+		p.CDI = cxicdi.GetCDISpecs(p.CDIPath)
+	}
 	signal.Notify(p.signal, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
 
 	return nil
@@ -157,6 +175,27 @@ func (p *HPECXIPlugin) GetPreferredAllocation(context.Context, *pluginapi.Prefer
 	return &pluginapi.PreferredAllocationResponse{}, nil
 }
 
+// TODO:
+// func (plugin *HPECXIPlugin) updateResponseForCDI(response *pluginapi.ContainerAllocateResponse) {
+// 	if plugin.CDI == nil {
+// 		return
+// 	}
+
+// 	cdiSpec := &specs.Spec{
+// 		Spec: plugin.CDI,
+// 	}
+
+// 	for _, dev := range response.Devices {
+// 		cdiSpec.Devices = append(cdiSpec.Devices, cdiapi.Device{
+// 			Name: dev.HostPath,
+// 			ID:   dev.ContainerPath,
+// 		})
+// 	}
+
+//		response.Envs = cdiSpec.GetEnvVars()
+//		response.Mounts = append(response.Mounts, cdiSpec.GetMounts()...)
+//	}
+//
 // Allocate is called during container creation so that the Device
 // Plugin can run device specific operations and instruct Kubelet
 // of the steps to make the Device available in the container
@@ -223,14 +262,5 @@ func (l *HPECXILister) Discover(pluginListCh chan dpm.PluginNameList) {
 			// Stop resourceUpdateCh
 			return
 		}
-	}
-}
-
-// NewPlugin instantiates a plugin implementation. It is given the last name of the resource,
-// e.g. for resource name "color.example.com/red" that would be "red". It must return valid
-// implementation of a PluginInterface.
-func (l *HPECXILister) NewPlugin(resourceLastName string) dpm.PluginInterface {
-	return &HPECXIPlugin{
-		Heartbeat: l.Heartbeat,
 	}
 }
