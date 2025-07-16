@@ -10,7 +10,7 @@ import (
 	"k8s.io/klog/v2"
 	cdiapi "tags.cncf.io/container-device-interface/pkg/cdi"
 
-	"github.com/HewlettPackard/cxi-k8s-device-plugin/pkg/cxicdi"
+	cxicdi "github.com/HewlettPackard/cxi-k8s-device-plugin/pkg/cxi-cdi"
 	device "github.com/HewlettPackard/cxi-k8s-device-plugin/pkg/hpecxi"
 )
 
