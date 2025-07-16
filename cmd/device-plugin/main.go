@@ -47,7 +47,7 @@ func main() {
 
 	for i, arg := range os.Args {
 		if arg == "-enable-cdi" || arg == "--enable-cdi" {
-			os.Args[i] = "-enable-cdi=/etc/cdi/"
+			os.Args[i] = "-enable-cdi=/etc/cdi/hpe.com-cxi.yaml"
 		}
 	}
 
@@ -61,7 +61,7 @@ func main() {
 	var pulse int
 	flag.IntVar(&pulse, "pulse", 0, "time between health check polling in seconds.  Set to 0 to disable.")
 	var cdi cdiFlag
-	flag.Var(&cdi, "enable-cdi", "enable CDI and set CDI path (default: /etc/cdi/ when flag is present)")
+	flag.Var(&cdi, "enable-cdi", "enable CDI and set CDI path (default: /etc/cdi/hpe.com-cxi.yaml when flag is present)")
 	flag.Parse()
 
 	if cdi.set {
@@ -77,7 +77,9 @@ func main() {
 	l := plugin.HPECXILister{
 		ResUpdateChan: make(chan dpm.PluginNameList),
 		Heartbeat:     make(chan bool),
-		CDI:           cdi.value,
+		Signal:        make(chan os.Signal),
+		CDIEnabled:    cdi.set,
+		CDIPath:       cdi.value,
 	}
 	manager := dpm.NewManager(&l)
 
