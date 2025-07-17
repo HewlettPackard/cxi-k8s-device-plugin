@@ -88,6 +88,26 @@ func getCDIDevices(spec *specs.Spec) map[string]specs.DeviceNode {
 	return devices
 }
 
+func ConvertDeviceNodestoDeviceSpecs(deviceNodes map[string]specs.DeviceNode) []*pluginapi.DeviceSpec {
+	var deviceSpecs []*pluginapi.DeviceSpec
+
+	for _, node := range deviceNodes {
+		deviceSpecs = append(deviceSpecs, convertDeviceNodeToDeviceSpec(node))
+	}
+
+	return deviceSpecs
+}
+
+func ConvertMountstoMounts(mounts []specs.Mount) []*pluginapi.Mount {
+	var pluginMounts []*pluginapi.Mount
+
+	for _, mount := range mounts {
+		pluginMounts = append(pluginMounts, convertMountToMount(mount))
+	}
+
+	return pluginMounts
+}
+
 func GetDeviceSpecs(spec *specs.Spec) []*pluginapi.DeviceSpec {
 	deviceNodes := getCDIDevices(spec)
 	var deviceSpecs []*pluginapi.DeviceSpec
