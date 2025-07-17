@@ -5,48 +5,49 @@ import (
 
 	"gopkg.in/yaml.v2"
 	"k8s.io/klog/v2"
-	cdi "tags.cncf.io/container-device-interface/specs-go"
+
+	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
+	"tags.cncf.io/container-device-interface/specs-go"
 )
 
-func GetCDISpecs(fileName string) cdi.Spec {
+func GetCDISpecs(fileName string) (*specs.Spec, error) {
 	data, err := os.ReadFile(fileName)
 	if err != nil {
-		klog.Errorf("Failed to read YAML file. %v", err)
+		klog.Errorf("Failed to read CDI Spec file. %v", err)
+		return nil, err
 	}
 
 	// Unmarshal into specs.Spec
-	var spec cdi.Spec
+	var spec specs.Spec
 	if err := yaml.Unmarshal(data, &spec); err != nil {
-		klog.Errorf("Failed to unmarshal YAML: %v", err)
+		klog.Errorf("Failed to unmarshal CDI Spec YAML: %v", err)
+		return nil, err
 	}
-	return spec
+	return &spec, nil
 }
 
-func GetDeviceNodes(spec cdi.Spec) map[string]cdi.DeviceNode {
-	devices := make(map[string]cdi.DeviceNode)
-	if len(spec.Devices) == 0 {
-		klog.Error("No devices in the CDI specs.")
+func convertDeviceNodeToDeviceSpec(node specs.DeviceNode) *pluginapi.DeviceSpec {
+	return &pluginapi.DeviceSpec{
+		HostPath:      node.Path,
+		ContainerPath: node.Path,
+		Permissions:   "rw",
 	}
-	for _, device := range spec.Devices {
-		if device.ContainerEdits.DeviceNodes != nil {
-			for _, node := range device.ContainerEdits.DeviceNodes {
-				devices[device.Name] = cdi.DeviceNode{
-					Path:     node.Path,
-					HostPath: node.HostPath,
-					Type:     node.Type,
-				}
-			}
-		}
-	}
-	return devices
 }
 
-func GetMounts(spec cdi.Spec) []cdi.Mount {
-	var mounts []cdi.Mount
+func convertMountToMount(mount specs.Mount) *pluginapi.Mount {
+	return &pluginapi.Mount{
+		HostPath:      mount.HostPath,
+		ContainerPath: mount.ContainerPath,
+		ReadOnly:      true,
+	}
+}
+
+func getCDIMounts(spec *specs.Spec) []specs.Mount {
+	var mounts []specs.Mount
 
 	if spec.ContainerEdits.Mounts != nil {
 		for _, mount := range spec.ContainerEdits.Mounts {
-			mounts = append(mounts, cdi.Mount{
+			mounts = append(mounts, specs.Mount{
 				HostPath:      mount.HostPath,
 				ContainerPath: mount.ContainerPath,
 				Options:       mount.Options,
@@ -57,17 +58,53 @@ func GetMounts(spec cdi.Spec) []cdi.Mount {
 	return mounts
 }
 
-// func ReadCXICDIYAML(fileName string) (map[string]cdi.DeviceNode, []cdi.Mount) {
-// 	spec := GetCDISpecs(fileName)
-// 	devices := getDevicesInfo(spec)
-// 	mounts := getMountsInfo(spec)
+func getCDIDevices(spec *specs.Spec) map[string]specs.DeviceNode {
+	devices := make(map[string]specs.DeviceNode)
+	if len(spec.Devices) == 0 {
+		klog.Error("No devices in the CDI specs.")
+	}
+	for _, device := range spec.Devices {
+		if device.ContainerEdits.DeviceNodes != nil {
+			for _, node := range device.ContainerEdits.DeviceNodes {
+				devices[device.Name] = specs.DeviceNode{
+					Path:     node.Path,
+					HostPath: node.HostPath,
+					Type:     node.Type,
+				}
+			}
+		}
+	}
+	for _, deviceNode := range spec.ContainerEdits.DeviceNodes {
+		if deviceNode != nil {
+			devices[deviceNode.Path] = specs.DeviceNode{
+				Path:     deviceNode.Path,
+				HostPath: deviceNode.HostPath,
+				Type:     deviceNode.Type,
+			}
+		}
+	}
 
-// 	if len(devices) == 0 {
-// 		klog.Error("No devices found in the CDI spec.")
-// 	}
-// 	if len(mounts) == 0 {
-// 		klog.Error("No mounts found in the CDI spec.")
-// 	}
+	return devices
+}
 
-// 	return devices, mounts
-// }
+func GetDeviceSpecs(spec *specs.Spec) []*pluginapi.DeviceSpec {
+	deviceNodes := getCDIDevices(spec)
+	var deviceSpecs []*pluginapi.DeviceSpec
+
+	for _, node := range deviceNodes {
+		deviceSpecs = append(deviceSpecs, convertDeviceNodeToDeviceSpec(node))
+	}
+
+	return deviceSpecs
+}
+
+func GetMounts(spec *specs.Spec) []*pluginapi.Mount {
+	mounts := getCDIMounts(spec)
+	var pluginMounts []*pluginapi.Mount
+
+	for _, mount := range mounts {
+		pluginMounts = append(pluginMounts, convertMountToMount(mount))
+	}
+
+	return pluginMounts
+}
