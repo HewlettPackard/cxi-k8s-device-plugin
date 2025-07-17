@@ -2,6 +2,7 @@ package cxicdi
 
 import (
 	"os"
+	"strings"
 
 	"gopkg.in/yaml.v2"
 	"k8s.io/klog/v2"
@@ -107,4 +108,17 @@ func GetMounts(spec *specs.Spec) []*pluginapi.Mount {
 	}
 
 	return pluginMounts
+}
+
+func GetEnvVars(spec *specs.Spec) map[string]string {
+	envVars := make(map[string]string)
+	if spec.ContainerEdits.Env != nil {
+		for _, env := range spec.ContainerEdits.Env {
+			parts := strings.Split(env, "=")
+			if len(parts) == 2 {
+				envVars[parts[0]] = parts[1]
+			}
+		}
+	}
+	return envVars
 }

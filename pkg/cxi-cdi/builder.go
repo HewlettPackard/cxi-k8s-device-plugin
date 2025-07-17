@@ -52,16 +52,16 @@ func buildNewRegistry(cdiCache *cdiapi.Cache, devices device.DevicesInfo, mounts
 		Kind: device.Kind,
 	}
 
-	AddDevicesToSpec(devices, spec)
+	addDevicesToSpec(devices, spec)
 	klog.V(5).Infof("spec devices length: %v", len(spec.Devices))
 
-	AddMountstoSpec(mounts, spec)
+	addMountstoSpec(mounts, spec)
 	klog.V(5).Infof("spec mounts length: %v", len(spec.ContainerEdits.Mounts))
 
-	AddXpmemtoSpec(spec)
+	addXpmemtoSpec(spec)
 	klog.V(5).Infof("spec xpmem device node added")
 
-	AddEnvVarsToSpec(envVars, spec)
+	addEnvVarsToSpec(envVars, spec)
 	klog.V(5).Infof("spec environment variables added: %v", len(spec.ContainerEdits.Env))
 
 	cdiVersion, err := cdiapi.MinimumRequiredVersion(spec)
@@ -85,7 +85,7 @@ func buildNewRegistry(cdiCache *cdiapi.Cache, devices device.DevicesInfo, mounts
 	return nil
 }
 
-func AddDevicesToSpec(devices device.DevicesInfo, spec *specs.Spec) {
+func addDevicesToSpec(devices device.DevicesInfo, spec *specs.Spec) {
 	devPath := device.GetDevPath()
 	deviceNodes := []*specs.DeviceNode{}
 	for _, device := range devices {
@@ -112,7 +112,7 @@ func AddDevicesToSpec(devices device.DevicesInfo, spec *specs.Spec) {
 	spec.Devices = append(spec.Devices, allDevice)
 }
 
-func AddMountstoSpec(mounts device.MountsInfo, spec *specs.Spec) {
+func addMountstoSpec(mounts device.MountsInfo, spec *specs.Spec) {
 	for _, mount := range mounts {
 		mount := &specs.Mount{
 			HostPath:      mount.HostPath,
@@ -124,7 +124,7 @@ func AddMountstoSpec(mounts device.MountsInfo, spec *specs.Spec) {
 	}
 }
 
-func AddXpmemtoSpec(spec *specs.Spec) {
+func addXpmemtoSpec(spec *specs.Spec) {
 	xpmemPath := device.GetXpmemDevPath()
 	xpmemMount := &specs.DeviceNode{
 		Path:     xpmemPath,
@@ -134,7 +134,7 @@ func AddXpmemtoSpec(spec *specs.Spec) {
 	spec.ContainerEdits.DeviceNodes = append(spec.ContainerEdits.DeviceNodes, xpmemMount)
 }
 
-func AddEnvVarsToSpec(envVars []string, spec *specs.Spec) {
+func addEnvVarsToSpec(envVars []string, spec *specs.Spec) {
 	if len(envVars) == 0 {
 		klog.V(5).Infof("No environment variables to add to CDI spec")
 		return

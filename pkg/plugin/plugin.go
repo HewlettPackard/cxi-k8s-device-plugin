@@ -160,8 +160,11 @@ func (plugin *HPECXIPlugin) updateContainerAllocateResponseForCDI(car *pluginapi
 	}
 	devices := cxicdi.GetDeviceSpecs(plugin.CDI)
 	mounts := cxicdi.GetMounts(plugin.CDI)
+	envVars := cxicdi.GetEnvVars(plugin.CDI)
+
 	car.Devices = append(car.Devices, devices...)
 	car.Mounts = append(car.Mounts, mounts...)
+	car.Envs = envVars
 }
 
 // //
