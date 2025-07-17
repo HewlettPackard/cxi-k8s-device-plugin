@@ -39,7 +39,7 @@ func newCommand() *cobra.Command {
 		Long:  "HPE Slingshot CDI Generator detects supported NICs and creates CDI specs for them.",
 
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			flag.Set("V", strconv.Itoa(verboseLevel))
+			flag.Set("v", strconv.Itoa(verboseLevel))
 			_ = flag.CommandLine.Parse([]string{})
 		},
 
@@ -90,7 +90,7 @@ func cobraRunFunc(cmd *cobra.Command, args []string) error {
 	var envVars = device.DiscoverEnvVars(envVarsPath)
 	klog.V(1).Infof("Discovered environment variables from %s:\n", envVarsPath)
 	for _, envVar := range envVars {
-		klog.V(1).Infof("->" + envVar)
+		klog.V(1).Infof("-> %s", envVar)
 	}
 
 	if dryRun {
