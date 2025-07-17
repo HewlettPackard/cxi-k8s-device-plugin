@@ -23,15 +23,14 @@ func getCXISpecs(cdiCache *cdiapi.Cache) []*cdiapi.Spec {
 	return cxiSpecs
 }
 
-func SyncRegistry(cdiCache *cdiapi.Cache, detectedDevices device.DevicesInfo, detectedMounts device.MountsInfo, envVars []string, doCleanup bool) error {
+func SyncRegistry(cdiCache *cdiapi.Cache, detectedDevices device.DevicesInfo, detectedMounts []specs.Mount, envVars []string, doCleanup bool) error {
 
 	vendorSpecs := getCXISpecs(cdiCache)
 	devicesToAdd := detectedDevices.Clone()
-	mountsToAdd := detectedMounts.Clone()
 
 	if len(vendorSpecs) == 0 {
 		klog.V(5).Infof("No existing specs found for vendor %v, creating new", device.Vendor)
-		if err := buildNewRegistry(cdiCache, devicesToAdd, mountsToAdd, envVars); err != nil {
+		if err := buildNewRegistry(cdiCache, devicesToAdd, detectedMounts, envVars); err != nil {
 			klog.V(5).Infof("Failed adding card to cdi registry: %v", err)
 			return err
 		}
@@ -45,7 +44,7 @@ func SyncRegistry(cdiCache *cdiapi.Cache, detectedDevices device.DevicesInfo, de
 	return nil
 }
 
-func buildNewRegistry(cdiCache *cdiapi.Cache, devices device.DevicesInfo, mounts device.MountsInfo, envVars []string) error {
+func buildNewRegistry(cdiCache *cdiapi.Cache, devices device.DevicesInfo, mounts []specs.Mount, envVars []string) error {
 	klog.V(5).Infof("Adding %v devices to new spec", len(devices))
 
 	spec := &specs.Spec{
@@ -112,7 +111,7 @@ func addDevicesToSpec(devices device.DevicesInfo, spec *specs.Spec) {
 	spec.Devices = append(spec.Devices, allDevice)
 }
 
-func addMountstoSpec(mounts device.MountsInfo, spec *specs.Spec) {
+func addMountstoSpec(mounts []specs.Mount, spec *specs.Spec) {
 	for _, mount := range mounts {
 		mount := &specs.Mount{
 			HostPath:      mount.HostPath,
