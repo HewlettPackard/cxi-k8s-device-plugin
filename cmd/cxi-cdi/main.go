@@ -47,7 +47,7 @@ func newCommand() *cobra.Command {
 	}
 
 	cmd.Version = version
-	cmd.PersistentFlags().IntVarP(&verboseLevel, "verbose", "V", 5, "Set verbosity level for logging (0-5)")
+	cmd.PersistentFlags().IntVarP(&verboseLevel, "verbose", "V", 0, "Set verbosity level for logging (0-5)")
 	cmd.Flags().BoolP("version", "v", false, "Show the version of the binary")
 	cmd.Flags().String("cdi-dir", "/etc/cdi", "CDI spec directory")
 	cmd.Flags().String("env-vars", "", "YAML file with environment variables to set in CDI specs")
@@ -84,7 +84,7 @@ func cobraRunFunc(cmd *cobra.Command, args []string) error {
 
 	var mountsList = device.DiscoverMounts()
 	for _, mount := range mountsList {
-		klog.V(1).Infof("Discovered mount: %s, Path: %s\n", mount.Name, mount.HostPath)
+		klog.V(1).Infof("Discovered mount path: %s\n", mount.HostPath)
 	}
 
 	var envVars = device.DiscoverEnvVars(envVarsPath)
