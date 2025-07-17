@@ -1,7 +1,6 @@
 package plugin
 
 import (
-	"fmt"
 	"os"
 	"os/signal"
 	"strconv"
@@ -19,6 +18,10 @@ import (
 )
 
 const resourceNamespace string = "beta.hpe.com"
+
+var envVars = map[string]string{
+	"LD_LIBRARY_PATH": "/opt/cray/lib64:/usr/lib64",
+}
 
 // Plugin is identical to DevicePluginServer interface of device plugin API.
 type HPECXIPlugin struct {
@@ -178,38 +181,14 @@ func (plugin *HPECXIPlugin) Allocate(ctx context.Context, r *pluginapi.AllocateR
 	if plugin.CDIEnabled {
 		plugin.updateContainerAllocateResponseForCDI(&car)
 	} else {
-		var dev *pluginapi.DeviceSpec
-		var mount *pluginapi.Mount
-		libpaths, err := hpecxi.GetLibs()
-		if err != nil {
-			return nil, err
-		}
+		var mountsList = hpecxi.DiscoverMounts()
+		var devicesList = hpecxi.DiscoverDevices()
 
-		for _, libpath := range libpaths {
-			klog.Infof("Mounting %s", libpath)
-			mountPath := libpath
-			mount = new(pluginapi.Mount)
-			mount.HostPath = mountPath
-			mount.ContainerPath = mountPath
-			mount.ReadOnly = true
-			car.Mounts = append(car.Mounts, mount)
-		}
-
-		for _, req := range r.ContainerRequests {
-
-			for _, id := range req.DevicesIDs {
-				klog.Infof("Allocating cxi%s", id)
-				devPath := fmt.Sprintf("/dev/cxi%s", id)
-				dev = new(pluginapi.DeviceSpec)
-				dev.HostPath = devPath
-				dev.ContainerPath = devPath
-				dev.Permissions = "rw"
-				car.Devices = append(car.Devices, dev)
-			}
-
-		}
-		car.Envs = hpecxi.EnvVars
+		car.Mounts = append(car.Mounts, cxicdi.ConvertMountstoMounts(mountsList)...)
+		car.Devices = append(car.Devices, devicesList.ConvertToDeviceSpecs()...)
+		car.Envs = envVars
 	}
+
 	response.ContainerResponses = append(response.ContainerResponses, &car)
 
 	return &response, nil

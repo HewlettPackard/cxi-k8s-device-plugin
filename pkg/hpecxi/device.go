@@ -4,9 +4,11 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"k8s.io/klog/v2"
+	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 )
 
 const (
@@ -72,6 +74,22 @@ func (g *DevicesInfo) Clone() DevicesInfo {
 		devicesInfoCopy[duid] = device.Clone()
 	}
 	return devicesInfoCopy
+}
+func convertDeviceInfoToDeviceSpec(device DeviceInfo) *pluginapi.DeviceSpec {
+	devicePath := GetDevPath() + strconv.FormatUint(device.DeviceId, 10)
+	return &pluginapi.DeviceSpec{
+		ContainerPath: devicePath,
+		HostPath:      devicePath,
+		Permissions:   "rw",
+	}
+}
+
+func (g *DevicesInfo) ConvertToDeviceSpecs() []*pluginapi.DeviceSpec {
+	var deviceSpecs []*pluginapi.DeviceSpec
+	for _, device := range *g {
+		deviceSpecs = append(deviceSpecs, convertDeviceInfoToDeviceSpec(*device))
+	}
+	return deviceSpecs
 }
 
 func GetDevPath() string {

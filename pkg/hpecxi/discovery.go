@@ -21,9 +21,9 @@ type Env struct {
 
 var DefaultOptions = []string{"ro", "nosuid", "nodev", "bind", "relatime"}
 
-func DiscoverDevices() map[string]*DeviceInfo {
+func DiscoverDevices() DevicesInfo {
 	sysfsDir := path.Join(GetSysfsRoot(Sysfspath), Sysfspath)
-	devices := make(map[string]*DeviceInfo)
+	devices := make(DevicesInfo)
 	files, err := os.ReadDir(sysfsDir)
 	if err != nil {
 		if err == os.ErrNotExist {
