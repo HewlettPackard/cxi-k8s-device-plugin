@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 
+	"tags.cncf.io/container-device-interface/specs-go"
+
 	"gopkg.in/yaml.v2"
 	"k8s.io/klog/v2"
 )
@@ -16,6 +18,8 @@ import (
 type Env struct {
 	Var []string `yaml:"env"`
 }
+
+var DefaultOptions = []string{"ro", "nosuid", "nodev", "bind", "relatime"}
 
 func DiscoverDevices() map[string]*DeviceInfo {
 	sysfsDir := path.Join(GetSysfsRoot(Sysfspath), Sysfspath)
@@ -103,8 +107,8 @@ func readDeviceNumber(deviceDir string) (uint64, error) {
 	return 0, fmt.Errorf("cxi device number not found for %s", deviceDir)
 }
 
-func DiscoverMounts() MountsInfo {
-	mounts := make(MountsInfo)
+func DiscoverMounts() []specs.Mount {
+	mounts := make([]specs.Mount, 0)
 	libFabricPath, err := GetLibfabricRoot()
 	if err != nil {
 		klog.Errorf("Failed to find Libfabric (%s): %+v", libFabricPath, err)
@@ -117,12 +121,12 @@ func DiscoverMounts() MountsInfo {
 		os.Exit(1)
 	}
 	klog.V(1).Infof("Using Libcxi root: %s", libcxiPath)
-	BuildMounts(libFabricPath, "libfabric", mounts)
-	BuildMounts(libcxiPath, "libcxi", mounts)
+	BuildMounts(libFabricPath, "libfabric", &mounts)
+	BuildMounts(libcxiPath, "libcxi", &mounts)
 	return mounts
 }
 
-func BuildMounts(path, name string, mounts MountsInfo) {
+func BuildMounts(path, name string, mounts *[]specs.Mount) {
 	files, err := os.ReadDir(path)
 	if err != nil {
 		klog.Errorf("Failed to read directory (%s): %+v", path, err)
@@ -133,9 +137,8 @@ func BuildMounts(path, name string, mounts MountsInfo) {
 			matchedFiles[file.Name()] = filepath.Join(path, file.Name())
 		}
 	}
-	for name, path := range matchedFiles {
-		mountInfo := &MountInfo{}
-		mountInfo.Name = name
+	for _, path := range matchedFiles {
+		mountInfo := specs.Mount{}
 		mountInfo.HostPath = path
 		mountInfo.ContainerPath = path
 
@@ -164,7 +167,7 @@ func BuildMounts(path, name string, mounts MountsInfo) {
 		default:
 			klog.Warningf("Unknown file type for %s", path)
 		}
-		mounts[name] = mountInfo
+		*mounts = append(*mounts, mountInfo)
 	}
 }
 
