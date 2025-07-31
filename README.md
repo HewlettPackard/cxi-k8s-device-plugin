@@ -1,5 +1,8 @@
 # CXI Kubernetes device plugin
 
+> [!CAUTION]
+This is a beta software, not recommended for production systems.
+
 ## Introduction
 
 This is a device plugin implementation that enables the registration of HPE Slingshot Cassini NICs in a Kubernetes cluster for compute workload.
@@ -10,7 +13,7 @@ This is a device plugin implementation that enables the registration of HPE Slin
 
 ##### - CXI Services Enabled
 
-This step must be executed for every node and every Slingshot NIC that servers the Kubernetes cluster:
+This step must be executed for every node and every Slingshot NIC that serves the Kubernetes cluster:
 ```
 cxi_service enable -d cxiX -s 1
 ```
@@ -32,7 +35,7 @@ kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-c
 
 ##### - Whereabouts CNI
 
-Whereabouts is an IP Address Management (IPAM) CNI plugin that assigns IP addresses cluster wide.  
+Whereabouts is an IP Address Management (IPAM) CNI plugin that assigns IP addresses cluster-wide.  
 ```
 git clone https://github.com/k8snetworkplumbingwg/whereabouts
 cd whereabouts
@@ -45,7 +48,7 @@ kubectl apply \
 ## Deployment
 
 Alpha-version image available at `hub.docker.hpecorp.net/caio.davi/cxi-k8s-device-plugin:0.1`. 
-The device plugin should run in every node with available Cassini NICs, in other to make them availabel to the K8s cluster. The easiest way of doing so is to create a Kubernetes DaemonSet:
+The device plugin should run in every node with available Cassini NICs, in order to make them available to the K8s cluster. The easiest way of doing so is to create a Kubernetes DaemonSet:
 
 ```
 kubectl apply \
