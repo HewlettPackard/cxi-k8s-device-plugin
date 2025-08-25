@@ -136,12 +136,12 @@ cxi-cdi-generator --cdi-dir {dir_path}
 You may also use `cxi-cdi-generator --help` for more options. 
 
 ### Environment Variables
+ 
+| EnvVar              | Default Value     | Details                                      |
+| ------------------- | ----------------- | -------------------------------------------- |
+| SYSFS_ROOT          | `/sys`            | SystemFs path on host                        |
+| DEVFS_ROOT          | `/dev`            | DevFs path on host                           |
+| OFI_ROOT            | `/opt/cray/lib64` | Libfabric pathon host                        |
+| CXI_ROOT            | `/usr/lib64`      | Libcxi path on host                          |
+| CXI_VIRTUAL_DEVICES | `0`               | Number of virtual devices per phyical device |
 
-During execution, `cxi-cdi-generator` will look into the following default paths for the discovery process. If any of these components are placed in a different path in your system, you can set it up using the corresponding environment variable.  
-
-| EnvVar     | Default Value     | Details               |
-| ---------- | ----------------- | --------------------- |
-| SYSFS_ROOT | `/sys`            | SystemFs path on host |
-| DEVFS_ROOT | `/dev`            | DevFs path on host    |
-| OFI_ROOT   | `/opt/cray/lib64` | Libfabric pathon host |
-| CXI_ROOT   | `/usr/lib64`      | Libcxi path on host  |
