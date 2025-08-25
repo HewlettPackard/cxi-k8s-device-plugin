@@ -111,7 +111,7 @@ func (plugin *HPECXIPlugin) ListAndWatch(e *pluginapi.Empty, s pluginapi.DeviceP
 		plugin.VirtualToPhysicalMap = make(map[string]int)
 	}
 
-	const virtualDevicesPerPhysical = 4 // Number of virtual devices per physical device
+	var virtualDevicesPerPhysical = hpecxi.GetVirtualDevicesCount() // Number of virtual devices per physical device
 
 	var devicesList = hpecxi.DiscoverDevices()
 
