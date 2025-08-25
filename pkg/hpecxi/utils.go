@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 
 	"k8s.io/klog/v2"
@@ -25,6 +26,9 @@ const (
 	libcxiName        = "libcxi.so"
 
 	PCIAddressLength = len("0000:00:00.0")
+
+	virtualDevicesEnvVarName   = "CXI_VIRTUAL_DEVICES"
+	virtualDevicesDefaultValue = "0"
 )
 
 func GetSysfsRoot(sysfsPath string) string {
@@ -122,6 +126,19 @@ func existInPath(libName, libPath string, exists *bool) error {
 		}
 	}
 	return nil
+}
+
+func GetVirtualDevicesCount() int {
+	virtualDevicesPerPhysical, found := os.LookupEnv(virtualDevicesEnvVarName)
+	if !found {
+		virtualDevicesPerPhysical = virtualDevicesDefaultValue
+	}
+	count, err := strconv.Atoi(virtualDevicesPerPhysical)
+	if err != nil {
+		klog.Errorf("Error parsing %s: %v", virtualDevicesEnvVarName, err)
+		return 0
+	}
+	return count
 }
 
 func PciInfoFromDeviceUID(deviceUID string) (string, string) {
