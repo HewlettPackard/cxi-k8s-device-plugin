@@ -121,6 +121,10 @@ func (plugin *HPECXIPlugin) ListAndWatch(e *pluginapi.Empty, s pluginapi.DeviceP
 		klog.Infof("Discovered physical device: %s", device.Name)
 		plugin.CXIs[device.Name] = int(device.DeviceId)
 
+		// TODO: FIX BUG. It will not create any device if `CXI_VIRTUAL_DEVICES` is set to 0. Quick fix: set default value to 1.
+		if virtualDevicesPerPhysical == 0 {
+			virtualDevicesPerPhysical = 1
+		}
 		// Create multiple virtual devices for this physical device
 		for i := 0; i < virtualDevicesPerPhysical; i++ {
 			virtualDeviceID := strconv.Itoa(virtualDeviceIndex)
@@ -175,6 +179,8 @@ loop:
 // devicemanager. It is only designed to help the devicemanager make a more
 // informed allocation decision when possible.
 func (plugin *HPECXIPlugin) GetPreferredAllocation(context.Context, *pluginapi.PreferredAllocationRequest) (*pluginapi.PreferredAllocationResponse, error) {
+	// TODO: Preferred allocation logic should enforce virtual devices
+	// requested are not mapped to the same physical device.
 	return &pluginapi.PreferredAllocationResponse{}, nil
 }
 
@@ -200,6 +206,9 @@ func (plugin *HPECXIPlugin) Allocate(ctx context.Context, r *pluginapi.AllocateR
 	var response pluginapi.AllocateResponse
 
 	for _, req := range r.ContainerRequests {
+
+		// TODO:  assert(len(req.DevicesIDs) <= len(HPECXIPlugin.CXIs))
+		// TODO:  assert requested devices are not mapped to the same physical device.
 		car := pluginapi.ContainerAllocateResponse{}
 
 		// Log which virtual devices are being allocated
@@ -209,17 +218,26 @@ func (plugin *HPECXIPlugin) Allocate(ctx context.Context, r *pluginapi.AllocateR
 			}
 		}
 
+		car.Envs = make(map[string]string)
+		for k, v := range envVars {
+			car.Envs[k] = v
+			klog.Infof("Setting env var: %s=%s", k, v)
+		}
+
 		if plugin.CDIEnabled {
 			plugin.updateContainerAllocateResponseForCDI(&car)
 		} else {
 			var mountsList = hpecxi.DiscoverMounts()
+
+			// TODO: Filter devicesList based on the req.DevicesIDs
 			var devicesList = hpecxi.DiscoverDevices()
 
 			car.Mounts = append(car.Mounts, cxicdi.ConvertMountstoMounts(mountsList)...)
 			car.Devices = append(car.Devices, devicesList.ConvertToDeviceSpecs()...)
-			car.Envs = envVars
 		}
 
+		klog.Infof("Final container response - Envs: %+v, Mounts: %d, Devices: %d",
+			car.Envs, len(car.Mounts), len(car.Devices))
 		response.ContainerResponses = append(response.ContainerResponses, &car)
 	}
 
