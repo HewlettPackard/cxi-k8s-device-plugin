@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -157,4 +158,14 @@ func DeviceUIDFromPCIinfo(pciAddress string, pciid string) string {
 	newUID := fmt.Sprintf("%v-%v", rfc1123PCIaddress, pciid)
 
 	return newUID
+}
+
+// ExtractCXINumber extracts the integer after '/dev/cxi' from a device path
+func ExtractCXINumber(devicePath string) (int, error) {
+	re := regexp.MustCompile(`/dev/cxi(\d+)`)
+	matches := re.FindStringSubmatch(devicePath)
+	if len(matches) < 2 {
+		return 0, fmt.Errorf("no CXI number found in device path: %s", devicePath)
+	}
+	return strconv.Atoi(matches[1])
 }
