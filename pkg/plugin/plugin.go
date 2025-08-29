@@ -179,23 +179,40 @@ loop:
 // devicemanager. It is only designed to help the devicemanager make a more
 // informed allocation decision when possible.
 func (plugin *HPECXIPlugin) GetPreferredAllocation(context.Context, *pluginapi.PreferredAllocationRequest) (*pluginapi.PreferredAllocationResponse, error) {
-	// TODO: Preferred allocation logic should enforce virtual devices
-	// requested are not mapped to the same physical device.
 	return &pluginapi.PreferredAllocationResponse{}, nil
 }
 
-//	TODO: updateResponseForCDI must go by the filterDevicesByVirtualIDs
-//		  For this, filterDevicesByVirtualIDs must receive []pluginapi.DeviceSpec
-//		  instead of hpecxi.DevicesInfo
-//
+// filterDevicesByVirtualIDs filters the physical devices based on requested virtual device IDs
+func (plugin *HPECXIPlugin) filterCDIDevicesByVirtualIDs(devicesList []*pluginapi.DeviceSpec, requestedDeviceIDs []string) []*pluginapi.DeviceSpec {
+	// Get unique physical device IDs that correspond to the requested virtual devices
+	physicalDeviceIDs := make(map[int]bool)
+	for _, deviceID := range requestedDeviceIDs {
+		if physicalID, exists := plugin.VirtualToPhysicalMap[deviceID]; exists {
+			physicalDeviceIDs[physicalID] = true
+		}
+	}
+
+	var filteredDevices []*pluginapi.DeviceSpec
+	for _, device := range devicesList {
+		id, err := hpecxi.ExtractCXINumber(device.HostPath)
+		if err == nil && physicalDeviceIDs[id] {
+			filteredDevices = append(filteredDevices, device)
+		}
+	}
+
+	return filteredDevices
+}
+
 // updateResponseForCDI updates the ContainerAllocateResponse with CDI specs
-func (plugin *HPECXIPlugin) updateContainerAllocateResponseForCDI(car *pluginapi.ContainerAllocateResponse) {
+func (plugin *HPECXIPlugin) updateContainerAllocateResponseForCDI(car *pluginapi.ContainerAllocateResponse, req *pluginapi.ContainerAllocateRequest) {
 	if !plugin.CDIEnabled {
 		return
 	}
 	devices := cxicdi.GetDeviceSpecs(plugin.CDI)
 	mounts := cxicdi.GetMounts(plugin.CDI)
 	envVars := cxicdi.GetEnvVars(plugin.CDI)
+
+	devices = plugin.filterCDIDevicesByVirtualIDs(devices, req.DevicesIDs)
 
 	car.Devices = append(car.Devices, devices...)
 	car.Mounts = append(car.Mounts, mounts...)
@@ -241,7 +258,7 @@ func (plugin *HPECXIPlugin) Allocate(ctx context.Context, r *pluginapi.AllocateR
 		}
 
 		if plugin.CDIEnabled {
-			plugin.updateContainerAllocateResponseForCDI(&car)
+			plugin.updateContainerAllocateResponseForCDI(&car, req)
 		} else {
 			var mountsList = hpecxi.DiscoverMounts()
 
