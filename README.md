@@ -1,4 +1,7 @@
 # CXI Kubernetes device plugin
+![Tests](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/caio-davi/74f8b6be0332fa5ee5672bd8ec57d871/raw/go-tests-badge.json)
+![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/caio-davi/74f8b6be0332fa5ee5672bd8ec57d871/raw/coverage-badge.json)
+
 
 > [!CAUTION]
 This is a beta software, not recommended for production systems.
