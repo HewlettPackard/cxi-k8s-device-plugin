@@ -1,14 +1,14 @@
 package plugin
 
 import (
-	"fmt"
 	"os"
 	"os/signal"
-	"path/filepath"
-	"regexp"
 	"strconv"
 	"syscall"
 
+	"tags.cncf.io/container-device-interface/specs-go"
+
+	cxicdi "github.com/HewlettPackard/cxi-k8s-device-plugin/pkg/cxi-cdi"
 	"github.com/HewlettPackard/cxi-k8s-device-plugin/pkg/hpecxi"
 
 	"github.com/kubevirt/device-plugin-manager/pkg/dpm"
@@ -19,11 +19,19 @@ import (
 
 const resourceNamespace string = "beta.hpe.com"
 
+var envVars = map[string]string{
+	"LD_LIBRARY_PATH": "/opt/cray/lib64:/usr/lib64",
+}
+
 // Plugin is identical to DevicePluginServer interface of device plugin API.
 type HPECXIPlugin struct {
-	CXIs      map[string]int
-	Heartbeat chan bool
-	signal    chan os.Signal
+	CXIs                 map[string]int
+	VirtualToPhysicalMap map[string]int
+	Heartbeat            chan bool
+	signal               chan os.Signal
+	CDIEnabled           bool
+	CDIPath              string
+	CDI                  *specs.Spec
 }
 
 // Lister serves as an interface between imlementation and Manager machinery. User passes
@@ -33,6 +41,16 @@ type HPECXILister struct {
 	ResUpdateChan chan dpm.PluginNameList
 	Heartbeat     chan bool
 	Signal        chan os.Signal
+	CDIEnabled    bool
+	CDIPath       string
+}
+
+func (l *HPECXILister) NewPlugin(resourceLastName string) dpm.PluginInterface {
+	return &HPECXIPlugin{
+		Heartbeat:  l.Heartbeat,
+		CDIPath:    l.CDIPath,
+		CDIEnabled: l.CDIEnabled,
+	}
 }
 
 // Start is an optional interface that could be implemented by plugin.
@@ -40,10 +58,16 @@ type HPECXILister struct {
 // plugin instantiation and before its registration to kubelet. This
 // method could be used to prepare resources before they are offered
 // to Kubernetes.
-func (p *HPECXIPlugin) Start() error {
-	p.signal = make(chan os.Signal, 1)
-	signal.Notify(p.signal, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
-
+func (plugin *HPECXIPlugin) Start() error {
+	plugin.signal = make(chan os.Signal, 1)
+	if plugin.CDIEnabled {
+		var err error
+		plugin.CDI, err = cxicdi.GetCDISpecs(plugin.CDIPath)
+		if err != nil {
+			return err
+		}
+	}
+	signal.Notify(plugin.signal, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
 	return nil
 }
 
@@ -53,30 +77,6 @@ func (p *HPECXIPlugin) Start() error {
 // down resources.
 func (p *HPECXIPlugin) Stop() error {
 	return nil
-}
-
-var topoSIMDre = regexp.MustCompile(`simd_count\s(\d+)`)
-
-func countCXIFromTopology(topoRootParam ...string) int {
-	topoRoot := "/sys/class/cxi"
-	// if len(topoRootParam) == 1 {
-	// 	topoRoot = topoRootParam[0]
-	// }
-
-	count := 0
-	var nodeFiles []string
-	var err error
-	if nodeFiles, err = filepath.Glob(topoRoot); err != nil {
-		klog.Fatalf("glob error: %s", err)
-		return count
-	}
-
-	for _, nodeFile := range nodeFiles {
-		// Count available Cassini devices.
-		fmt.Println(nodeFile)
-		count++
-	}
-	return count
 }
 
 func cxiSimpleHealthCheck(device *pluginapi.Device) string {
@@ -99,47 +99,77 @@ func (p *HPECXIPlugin) GetDevicePluginOptions(ctx context.Context, e *pluginapi.
 // PreStartContainer is expected to be called before each container start if indicated by plugin during registration phase.
 // PreStartContainer allows kubelet to pass reinitialized devices to containers.
 // PreStartContainer allows Device Plugin to run device specific operations on the Devices requested
-func (p *HPECXIPlugin) PreStartContainer(ctx context.Context, r *pluginapi.PreStartContainerRequest) (*pluginapi.PreStartContainerResponse, error) {
+func (plugin *HPECXIPlugin) PreStartContainer(ctx context.Context, r *pluginapi.PreStartContainerRequest) (*pluginapi.PreStartContainerResponse, error) {
 	return &pluginapi.PreStartContainerResponse{}, nil
 }
 
-// ListAndWatch returns a stream of List of Devices
-// Whenever a Device state change or a Device disappears, ListAndWatch
-// returns the new list
-func (p *HPECXIPlugin) ListAndWatch(e *pluginapi.Empty, s pluginapi.DevicePlugin_ListAndWatchServer) error {
-	p.CXIs = hpecxi.GetHPECXIs()
-	klog.Infof("Found %d HPE Slingshot NICs", len(p.CXIs))
+func (plugin *HPECXIPlugin) ListAndWatch(e *pluginapi.Empty, s pluginapi.DevicePlugin_ListAndWatchServer) error {
+	if plugin.CXIs == nil {
+		plugin.CXIs = make(map[string]int)
+	}
+	if plugin.VirtualToPhysicalMap == nil {
+		plugin.VirtualToPhysicalMap = make(map[string]int)
+	}
 
-	devs := make([]*pluginapi.Device, len(p.CXIs))
+	var virtualDevicesPerPhysical = hpecxi.GetVirtualDevicesCount() // Number of virtual devices per physical device
 
-	func() {
-		i := 0
-		for _, id := range p.CXIs {
-			dev := &pluginapi.Device{
-				ID:     strconv.Itoa(id),
-				Health: pluginapi.Healthy,
-			}
-			devs[i] = dev
-			i++
+	var devicesList = hpecxi.DiscoverDevices()
+
+	// Create multiple virtual devices for each physical device
+	virtualDeviceIndex := 0
+	for _, device := range devicesList {
+		klog.Infof("Discovered physical device: %s", device.Name)
+		plugin.CXIs[device.Name] = int(device.DeviceId)
+
+		// TODO: FIX BUG. It will not create any device if `CXI_VIRTUAL_DEVICES` is set to 0. Quick fix: set default value to 1.
+		if virtualDevicesPerPhysical == 0 {
+			virtualDevicesPerPhysical = 1
 		}
-	}()
+		// Create multiple virtual devices for this physical device
+		for i := 0; i < virtualDevicesPerPhysical; i++ {
+			virtualDeviceID := strconv.Itoa(virtualDeviceIndex)
+			plugin.VirtualToPhysicalMap[virtualDeviceID] = int(device.DeviceId)
+			virtualDeviceIndex++
+		}
+	}
+
+	klog.Infof("Found %d HPE Slingshot NICs, created %d virtual devices", len(plugin.CXIs), len(plugin.VirtualToPhysicalMap))
+
+	// Create device list using virtual devices
+	devs := make([]*pluginapi.Device, len(plugin.VirtualToPhysicalMap))
+	index := 0
+	for virtualID, physicalID := range plugin.VirtualToPhysicalMap {
+		dev := &pluginapi.Device{
+			ID:     virtualID,
+			Health: pluginapi.Healthy,
+		}
+		devs[index] = dev
+		index++
+		klog.Infof("Created virtual device %s mapped to physical device %d", virtualID, physicalID)
+	}
 
 	s.Send(&pluginapi.ListAndWatchResponse{Devices: devs})
 
 loop:
 	for {
 		select {
-		case <-p.Heartbeat:
-			for i := 0; i < len(p.CXIs); i++ {
-				devs[i].Health = cxiSimpleHealthCheck(devs[i])
+		case <-plugin.Heartbeat:
+			// Health check all virtual devices by checking their corresponding physical devices
+			for i, dev := range devs {
+				physicalDeviceID := plugin.VirtualToPhysicalMap[dev.ID]
+				// Create a temporary device for health check with physical ID
+				tempDevice := &pluginapi.Device{
+					ID: strconv.Itoa(physicalDeviceID),
+				}
+				devs[i].Health = cxiSimpleHealthCheck(tempDevice)
+				klog.Infof("[Health Check] virtual device %s (physical cxi%d): %s", dev.ID, physicalDeviceID, devs[i].Health)
 			}
 			s.Send(&pluginapi.ListAndWatchResponse{Devices: devs})
-		case <-p.signal:
+		case <-plugin.signal:
 			klog.Infof("Received signal, exiting")
 			break loop
 		}
 	}
-	// returning a value with this function will unregister the plugin from k8s
 	return nil
 }
 
@@ -148,51 +178,82 @@ loop:
 // guaranteed to be the allocation ultimately performed by the
 // devicemanager. It is only designed to help the devicemanager make a more
 // informed allocation decision when possible.
-func (p *HPECXIPlugin) GetPreferredAllocation(context.Context, *pluginapi.PreferredAllocationRequest) (*pluginapi.PreferredAllocationResponse, error) {
+func (plugin *HPECXIPlugin) GetPreferredAllocation(context.Context, *pluginapi.PreferredAllocationRequest) (*pluginapi.PreferredAllocationResponse, error) {
 	return &pluginapi.PreferredAllocationResponse{}, nil
+}
+
+// filterDevicesByVirtualIDs filters the physical devices based on requested virtual device IDs
+func (plugin *HPECXIPlugin) filterDevicesByVirtualIDs(devicesList []*pluginapi.DeviceSpec, requestedDeviceIDs []string) []*pluginapi.DeviceSpec {
+	// Get unique physical device IDs that correspond to the requested virtual devices
+	physicalDeviceIDs := make(map[int]bool)
+	for _, deviceID := range requestedDeviceIDs {
+		if physicalID, exists := plugin.VirtualToPhysicalMap[deviceID]; exists {
+			physicalDeviceIDs[physicalID] = true
+		}
+	}
+
+	var filteredDevices []*pluginapi.DeviceSpec
+	for _, device := range devicesList {
+		id, err := hpecxi.ExtractCXINumber(device.HostPath)
+		if err == nil && physicalDeviceIDs[id] {
+			filteredDevices = append(filteredDevices, device)
+		}
+	}
+
+	return filteredDevices
+}
+
+// updateResponseForCDI updates the ContainerAllocateResponse with CDI specs
+func (plugin *HPECXIPlugin) updateContainerAllocateResponseForCDI(car *pluginapi.ContainerAllocateResponse, req *pluginapi.ContainerAllocateRequest) {
+	if !plugin.CDIEnabled {
+		return
+	}
+	devices := cxicdi.GetDeviceSpecs(plugin.CDI)
+	mounts := cxicdi.GetMounts(plugin.CDI)
+	envVars := cxicdi.GetEnvVars(plugin.CDI)
+
+	devices = plugin.filterDevicesByVirtualIDs(devices, req.DevicesIDs)
+
+	car.Devices = append(car.Devices, devices...)
+	car.Mounts = append(car.Mounts, mounts...)
+	car.Envs = envVars
 }
 
 // Allocate is called during container creation so that the Device
 // Plugin can run device specific operations and instruct Kubelet
 // of the steps to make the Device available in the container
-func (p *HPECXIPlugin) Allocate(ctx context.Context, r *pluginapi.AllocateRequest) (*pluginapi.AllocateResponse, error) {
+func (plugin *HPECXIPlugin) Allocate(ctx context.Context, r *pluginapi.AllocateRequest) (*pluginapi.AllocateResponse, error) {
 	var response pluginapi.AllocateResponse
-	var car pluginapi.ContainerAllocateResponse
-	var dev *pluginapi.DeviceSpec
-	var mount *pluginapi.Mount
-
-	car = pluginapi.ContainerAllocateResponse{}
-	libpaths, err := hpecxi.GetLibs()
-
-	if err != nil {
-		return nil, err
-	}
-
-	for _, libpath := range libpaths {
-		klog.Infof("Mounting %s", libpath)
-		mountPath := libpath
-		mount = new(pluginapi.Mount)
-		mount.HostPath = mountPath
-		mount.ContainerPath = mountPath
-		mount.ReadOnly = true
-		car.Mounts = append(car.Mounts, mount)
-	}
 
 	for _, req := range r.ContainerRequests {
 
-		for _, id := range req.DevicesIDs {
-			klog.Infof("Allocating cxi%s", id)
-			devPath := fmt.Sprintf("/dev/cxi%s", id)
-			dev = new(pluginapi.DeviceSpec)
-			dev.HostPath = devPath
-			dev.ContainerPath = devPath
-			dev.Permissions = "rw"
-			car.Devices = append(car.Devices, dev)
+		// TODO:  assert(len(req.DevicesIDs) <= len(HPECXIPlugin.CXIs))
+		// TODO:  assert requested devices are not mapped to the same physical device.
+		car := pluginapi.ContainerAllocateResponse{}
+
+		// Log which virtual devices are being allocated
+		for _, deviceID := range req.DevicesIDs {
+			if physicalID, exists := plugin.VirtualToPhysicalMap[deviceID]; exists {
+				klog.Infof("Allocating virtual device %s (maps to physical device %d)", deviceID, physicalID)
+			}
 		}
 
+		if plugin.CDIEnabled {
+			plugin.updateContainerAllocateResponseForCDI(&car, req)
+		} else {
+			var mountsList = hpecxi.DiscoverMounts()
+
+			devices := hpecxi.DiscoverDevices()
+			devicesList := devices.ConvertToDeviceSpecs()
+			devicesList = plugin.filterDevicesByVirtualIDs(devicesList, req.DevicesIDs)
+
+			car.Mounts = append(car.Mounts, cxicdi.ConvertMountstoMounts(mountsList)...)
+			car.Devices = append(car.Devices, devicesList...)
+			car.Envs = envVars
+		}
+
+		response.ContainerResponses = append(response.ContainerResponses, &car)
 	}
-	car.Envs = hpecxi.EnvVars
-	response.ContainerResponses = append(response.ContainerResponses, &car)
 
 	return &response, nil
 }
@@ -218,14 +279,5 @@ func (l *HPECXILister) Discover(pluginListCh chan dpm.PluginNameList) {
 			// Stop resourceUpdateCh
 			return
 		}
-	}
-}
-
-// NewPlugin instantiates a plugin implementation. It is given the last name of the resource,
-// e.g. for resource name "color.example.com/red" that would be "red". It must return valid
-// implementation of a PluginInterface.
-func (l *HPECXILister) NewPlugin(resourceLastName string) dpm.PluginInterface {
-	return &HPECXIPlugin{
-		Heartbeat: l.Heartbeat,
 	}
 }
