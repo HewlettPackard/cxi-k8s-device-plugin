@@ -183,7 +183,7 @@ func (plugin *HPECXIPlugin) GetPreferredAllocation(context.Context, *pluginapi.P
 }
 
 // filterDevicesByVirtualIDs filters the physical devices based on requested virtual device IDs
-func (plugin *HPECXIPlugin) filterCDIDevicesByVirtualIDs(devicesList []*pluginapi.DeviceSpec, requestedDeviceIDs []string) []*pluginapi.DeviceSpec {
+func (plugin *HPECXIPlugin) filterDevicesByVirtualIDs(devicesList []*pluginapi.DeviceSpec, requestedDeviceIDs []string) []*pluginapi.DeviceSpec {
 	// Get unique physical device IDs that correspond to the requested virtual devices
 	physicalDeviceIDs := make(map[int]bool)
 	for _, deviceID := range requestedDeviceIDs {
@@ -212,30 +212,11 @@ func (plugin *HPECXIPlugin) updateContainerAllocateResponseForCDI(car *pluginapi
 	mounts := cxicdi.GetMounts(plugin.CDI)
 	envVars := cxicdi.GetEnvVars(plugin.CDI)
 
-	devices = plugin.filterCDIDevicesByVirtualIDs(devices, req.DevicesIDs)
+	devices = plugin.filterDevicesByVirtualIDs(devices, req.DevicesIDs)
 
 	car.Devices = append(car.Devices, devices...)
 	car.Mounts = append(car.Mounts, mounts...)
 	car.Envs = envVars
-}
-
-// filterDevicesByVirtualIDs filters the physical devices based on requested virtual device IDs
-func (plugin *HPECXIPlugin) filterDevicesByVirtualIDs(devicesList hpecxi.DevicesInfo, requestedDeviceIDs []string) hpecxi.DevicesInfo {
-	// Get unique physical device IDs that correspond to the requested virtual devices
-	physicalDeviceIDs := make(map[int]bool)
-	for _, deviceID := range requestedDeviceIDs {
-		if physicalID, exists := plugin.VirtualToPhysicalMap[deviceID]; exists {
-			physicalDeviceIDs[physicalID] = true
-		}
-	}
-	// Filter devicesList to only include devices with matching physical IDs
-	filteredDevices := make(hpecxi.DevicesInfo)
-	for _, device := range devicesList {
-		if physicalDeviceIDs[int(device.DeviceId)] {
-			filteredDevices[device.UID] = device
-		}
-	}
-	return filteredDevices
 }
 
 // Allocate is called during container creation so that the Device
@@ -262,10 +243,12 @@ func (plugin *HPECXIPlugin) Allocate(ctx context.Context, r *pluginapi.AllocateR
 		} else {
 			var mountsList = hpecxi.DiscoverMounts()
 
-			devicesList := plugin.filterDevicesByVirtualIDs(hpecxi.DiscoverDevices(), req.DevicesIDs)
+			devices := hpecxi.DiscoverDevices()
+			devicesList := devices.ConvertToDeviceSpecs()
+			devicesList = plugin.filterDevicesByVirtualIDs(devicesList, req.DevicesIDs)
 
 			car.Mounts = append(car.Mounts, cxicdi.ConvertMountstoMounts(mountsList)...)
-			car.Devices = append(car.Devices, devicesList.ConvertToDeviceSpecs()...)
+			car.Devices = append(car.Devices, devicesList...)
 			car.Envs = envVars
 		}
 
