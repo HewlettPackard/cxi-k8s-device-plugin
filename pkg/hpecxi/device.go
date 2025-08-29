@@ -75,6 +75,7 @@ func (g *DevicesInfo) Clone() DevicesInfo {
 	}
 	return devicesInfoCopy
 }
+
 func convertDeviceInfoToDeviceSpec(device DeviceInfo) *pluginapi.DeviceSpec {
 	devicePath := GetDevPath() + strconv.FormatUint(device.DeviceId, 10)
 	return &pluginapi.DeviceSpec{
