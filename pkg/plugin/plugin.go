@@ -184,7 +184,10 @@ func (plugin *HPECXIPlugin) GetPreferredAllocation(context.Context, *pluginapi.P
 	return &pluginapi.PreferredAllocationResponse{}, nil
 }
 
-// TODO:
+//	TODO: updateResponseForCDI must go by the filterDevicesByVirtualIDs
+//		  For this, filterDevicesByVirtualIDs must receive []pluginapi.DeviceSpec
+//		  instead of hpecxi.DevicesInfo
+//
 // updateResponseForCDI updates the ContainerAllocateResponse with CDI specs
 func (plugin *HPECXIPlugin) updateContainerAllocateResponseForCDI(car *pluginapi.ContainerAllocateResponse) {
 	if !plugin.CDIEnabled {
@@ -197,6 +200,25 @@ func (plugin *HPECXIPlugin) updateContainerAllocateResponseForCDI(car *pluginapi
 	car.Devices = append(car.Devices, devices...)
 	car.Mounts = append(car.Mounts, mounts...)
 	car.Envs = envVars
+}
+
+// filterDevicesByVirtualIDs filters the physical devices based on requested virtual device IDs
+func (plugin *HPECXIPlugin) filterDevicesByVirtualIDs(devicesList hpecxi.DevicesInfo, requestedDeviceIDs []string) hpecxi.DevicesInfo {
+	// Get unique physical device IDs that correspond to the requested virtual devices
+	physicalDeviceIDs := make(map[int]bool)
+	for _, deviceID := range requestedDeviceIDs {
+		if physicalID, exists := plugin.VirtualToPhysicalMap[deviceID]; exists {
+			physicalDeviceIDs[physicalID] = true
+		}
+	}
+	// Filter devicesList to only include devices with matching physical IDs
+	filteredDevices := make(hpecxi.DevicesInfo)
+	for _, device := range devicesList {
+		if physicalDeviceIDs[int(device.DeviceId)] {
+			filteredDevices[device.UID] = device
+		}
+	}
+	return filteredDevices
 }
 
 // Allocate is called during container creation so that the Device
@@ -218,26 +240,18 @@ func (plugin *HPECXIPlugin) Allocate(ctx context.Context, r *pluginapi.AllocateR
 			}
 		}
 
-		car.Envs = make(map[string]string)
-		for k, v := range envVars {
-			car.Envs[k] = v
-			klog.Infof("Setting env var: %s=%s", k, v)
-		}
-
 		if plugin.CDIEnabled {
 			plugin.updateContainerAllocateResponseForCDI(&car)
 		} else {
 			var mountsList = hpecxi.DiscoverMounts()
 
-			// TODO: Filter devicesList based on the req.DevicesIDs
-			var devicesList = hpecxi.DiscoverDevices()
+			devicesList := plugin.filterDevicesByVirtualIDs(hpecxi.DiscoverDevices(), req.DevicesIDs)
 
 			car.Mounts = append(car.Mounts, cxicdi.ConvertMountstoMounts(mountsList)...)
 			car.Devices = append(car.Devices, devicesList.ConvertToDeviceSpecs()...)
+			car.Envs = envVars
 		}
 
-		klog.Infof("Final container response - Envs: %+v, Mounts: %d, Devices: %d",
-			car.Envs, len(car.Mounts), len(car.Devices))
 		response.ContainerResponses = append(response.ContainerResponses, &car)
 	}
 
