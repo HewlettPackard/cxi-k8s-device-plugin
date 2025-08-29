@@ -1,6 +1,6 @@
 # CXI Kubernetes device plugin
-![Tests](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/caio-davi/74f8b6be0332fa5ee5672bd8ec57d871/raw/go-tests-badge.json)
-![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/caio-davi/74f8b6be0332fa5ee5672bd8ec57d871/raw/coverage-badge.json)
+![Tests](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/caio-davi/40551c54cd6c4079844a78fd6b46211f/raw/go-tests-badge.json&cacheSeconds=300)
+![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/caio-davi/40551c54cd6c4079844a78fd6b46211f/raw/coverage-badge.json&cacheSeconds=300)
 [![Go Report Card](https://goreportcard.com/badge/github.com/HewlettPackard/cxi-k8s-device-plugin)](https://goreportcard.com/report/github.com/HewlettPackard/cxi-k8s-device-plugin)
 
 > [!CAUTION]
