@@ -1,0 +1,78 @@
+
+name: Go Unit Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
+    - name: Run tests
+      id: test
+      run: make test
+      continue-on-error: true
+
+    - name: Generate test coverage
+      run: |
+        go test -v -coverprofile=coverage.out ./pkg/...
+        go tool cover -html=coverage.out -o coverage.html
+
+    - name: Extract coverage percentage
+      id: coverage
+      run: |
+        COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+        echo "percentage=$COVERAGE" >> $GITHUB_OUTPUT
+        echo "Coverage: $COVERAGE%"
+
+    - name: Create test results badge
+      uses: schneegans/dynamic-badges-action@v1.7.0
+      if: github.ref == 'refs/heads/main'
+      with:
+        auth: ${{ secrets.GITHUB_TOKEN }}
+        gistID: ${{ secrets.GIST_ID }}
+        filename: go-tests-badge.json
+        label: Tests
+        message: ${{ steps.test.outcome == 'success' && 'passing' || 'failing' }}
+        color: ${{ steps.test.outcome == 'success' && 'green' || 'red' }}
+
+    - name: Create coverage badge
+      uses: schneegans/dynamic-badges-action@v1.7.0
+      if: github.ref == 'refs/heads/main'
+      with:
+        auth: ${{ secrets.GITHUB_TOKEN }}
+        gistID: ${{ secrets.GIST_ID }}
+        filename: coverage-badge.json
+        label: Coverage
+        message: ${{ steps.coverage.outputs.percentage }}%
+        color: ${{ steps.coverage.outputs.percentage >= '80' && 'green' || steps.coverage.outputs.percentage >= '60' && 'yellow' || 'red' }}
+
+    - name: Upload coverage reports
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report
+        path: |
+          coverage.out
+          coverage.html
