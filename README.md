@@ -6,7 +6,7 @@
 > [!CAUTION]
 This is a beta software, not recommended for production systems.
 
-## Introduction
+## Introduction 
 
 This is a device plugin implementation that enables the registration of HPE Slingshot Cassini NICs in a Kubernetes cluster for compute workload.
 
