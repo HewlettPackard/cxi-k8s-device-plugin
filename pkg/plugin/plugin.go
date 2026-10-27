@@ -25,12 +25,13 @@ var envVars = map[string]string{
 
 // Plugin is identical to DevicePluginServer interface of device plugin API.
 type HPECXIPlugin struct {
-	CXIs       map[string]int
-	Heartbeat  chan bool
-	signal     chan os.Signal
-	CDIEnabled bool
-	CDIPath    string
-	CDI        *specs.Spec
+	CXIs                 map[string]int
+	VirtualToPhysicalMap map[string]int
+	Heartbeat            chan bool
+	signal               chan os.Signal
+	CDIEnabled           bool
+	CDIPath              string
+	CDI                  *specs.Spec
 }
 
 // Lister serves as an interface between imlementation and Manager machinery. User passes
@@ -109,22 +110,46 @@ func (plugin *HPECXIPlugin) ListAndWatch(e *pluginapi.Empty, s pluginapi.DeviceP
 	if plugin.CXIs == nil {
 		plugin.CXIs = make(map[string]int)
 	}
-	var devicesList = hpecxi.DiscoverDevices()
-	for _, device := range devicesList {
-		klog.Infof("Discovered device:  %s", device.Name)
-		plugin.CXIs[device.Name] = int(device.DeviceId)
+	if plugin.VirtualToPhysicalMap == nil {
+		plugin.VirtualToPhysicalMap = make(map[string]int)
 	}
-	klog.Infof("Found %d HPE Slingshot NICs", len(plugin.CXIs))
-	devs := make([]*pluginapi.Device, len(plugin.CXIs))
-	func() {
-		for _, id := range plugin.CXIs {
-			dev := &pluginapi.Device{
-				ID:     strconv.Itoa(id),
-				Health: pluginapi.Healthy,
-			}
-			devs[id] = dev
+
+	var virtualDevicesPerPhysical = hpecxi.GetVirtualDevicesCount() // Number of virtual devices per physical device
+
+	var devicesList = hpecxi.DiscoverDevices()
+
+	// Create multiple virtual devices for each physical device
+	virtualDeviceIndex := 0
+	for _, device := range devicesList {
+		klog.Infof("Discovered physical device: %s", device.Name)
+		plugin.CXIs[device.Name] = int(device.DeviceId)
+
+		// TODO: FIX BUG. It will not create any device if `CXI_VIRTUAL_DEVICES` is set to 0. Quick fix: set default value to 1.
+		if virtualDevicesPerPhysical == 0 {
+			virtualDevicesPerPhysical = 1
 		}
-	}()
+		// Create multiple virtual devices for this physical device
+		for i := 0; i < virtualDevicesPerPhysical; i++ {
+			virtualDeviceID := strconv.Itoa(virtualDeviceIndex)
+			plugin.VirtualToPhysicalMap[virtualDeviceID] = int(device.DeviceId)
+			virtualDeviceIndex++
+		}
+	}
+
+	klog.Infof("Found %d HPE Slingshot NICs, created %d virtual devices", len(plugin.CXIs), len(plugin.VirtualToPhysicalMap))
+
+	// Create device list using virtual devices
+	devs := make([]*pluginapi.Device, len(plugin.VirtualToPhysicalMap))
+	index := 0
+	for virtualID, physicalID := range plugin.VirtualToPhysicalMap {
+		dev := &pluginapi.Device{
+			ID:     virtualID,
+			Health: pluginapi.Healthy,
+		}
+		devs[index] = dev
+		index++
+		klog.Infof("Created virtual device %s mapped to physical device %d", virtualID, physicalID)
+	}
 
 	s.Send(&pluginapi.ListAndWatchResponse{Devices: devs})
 
@@ -132,9 +157,15 @@ loop:
 	for {
 		select {
 		case <-plugin.Heartbeat:
-			for i := 0; i < len(plugin.CXIs); i++ {
-				devs[i].Health = cxiSimpleHealthCheck(devs[i])
-				klog.Infof("[Health Check] cxi%d: %s", i, devs[i].Health)
+			// Health check all virtual devices by checking their corresponding physical devices
+			for i, dev := range devs {
+				physicalDeviceID := plugin.VirtualToPhysicalMap[dev.ID]
+				// Create a temporary device for health check with physical ID
+				tempDevice := &pluginapi.Device{
+					ID: strconv.Itoa(physicalDeviceID),
+				}
+				devs[i].Health = cxiSimpleHealthCheck(tempDevice)
+				klog.Infof("[Health Check] virtual device %s (physical cxi%d): %s", dev.ID, physicalDeviceID, devs[i].Health)
 			}
 			s.Send(&pluginapi.ListAndWatchResponse{Devices: devs})
 		case <-plugin.signal:
@@ -142,7 +173,6 @@ loop:
 			break loop
 		}
 	}
-	// returning a value with this function will unregister the plugin from k8s
 	return nil
 }
 
@@ -155,9 +185,28 @@ func (plugin *HPECXIPlugin) GetPreferredAllocation(context.Context, *pluginapi.P
 	return &pluginapi.PreferredAllocationResponse{}, nil
 }
 
-// TODO:
-// updateResponseForCDI updates the ContainerAllocateResponse with CDI specs
-func (plugin *HPECXIPlugin) updateContainerAllocateResponseForCDI(car *pluginapi.ContainerAllocateResponse) {
+// filterDevicesByVirtualIDs filters the physical devices based on requested virtual device IDs
+func (plugin *HPECXIPlugin) filterDevicesByVirtualIDs(devicesList []*pluginapi.DeviceSpec, requestedDeviceIDs []string) []*pluginapi.DeviceSpec {
+	// Get unique physical device IDs that correspond to the requested virtual devices
+	physicalDeviceIDs := make(map[int]bool)
+	for _, deviceID := range requestedDeviceIDs {
+		if physicalID, exists := plugin.VirtualToPhysicalMap[deviceID]; exists {
+			physicalDeviceIDs[physicalID] = true
+		}
+	}
+
+	var filteredDevices []*pluginapi.DeviceSpec
+	for _, device := range devicesList {
+		id, err := hpecxi.ExtractCXINumber(device.HostPath)
+		if err == nil && physicalDeviceIDs[id] {
+			filteredDevices = append(filteredDevices, device)
+		}
+	}
+
+	return filteredDevices
+}
+
+func (plugin *HPECXIPlugin) updateContainerAllocateResponseForCDI(car *pluginapi.ContainerAllocateResponse, req *pluginapi.ContainerAllocateRequest) {
 	if !plugin.CDIEnabled {
 		return
 	}
@@ -165,32 +214,47 @@ func (plugin *HPECXIPlugin) updateContainerAllocateResponseForCDI(car *pluginapi
 	mounts := cxicdi.GetMounts(plugin.CDI)
 	envVars := cxicdi.GetEnvVars(plugin.CDI)
 
+	devices = plugin.filterDevicesByVirtualIDs(devices, req.DevicesIDs)
+
 	car.Devices = append(car.Devices, devices...)
 	car.Mounts = append(car.Mounts, mounts...)
 	car.Envs = envVars
 }
 
-// //
 // Allocate is called during container creation so that the Device
 // Plugin can run device specific operations and instruct Kubelet
 // of the steps to make the Device available in the container
 func (plugin *HPECXIPlugin) Allocate(ctx context.Context, r *pluginapi.AllocateRequest) (*pluginapi.AllocateResponse, error) {
 	var response pluginapi.AllocateResponse
-	car := pluginapi.ContainerAllocateResponse{}
+	for _, req := range r.ContainerRequests {
 
-	if plugin.CDIEnabled {
-		plugin.updateContainerAllocateResponseForCDI(&car)
-	} else {
-		var mountsList = hpecxi.DiscoverMounts()
-		var devicesList = hpecxi.DiscoverDevices()
+		// TODO:  assert(len(req.DevicesIDs) <= len(HPECXIPlugin.CXIs))
+		// TODO:  assert requested devices are not mapped to the same physical device.
+		car := pluginapi.ContainerAllocateResponse{}
 
-		car.Mounts = append(car.Mounts, cxicdi.ConvertMountstoMounts(mountsList)...)
-		car.Devices = append(car.Devices, devicesList.ConvertToDeviceSpecs()...)
-		car.Envs = envVars
+		// Log which virtual devices are being allocated
+		for _, deviceID := range req.DevicesIDs {
+			if physicalID, exists := plugin.VirtualToPhysicalMap[deviceID]; exists {
+				klog.Infof("Allocating virtual device %s (maps to physical device %d)", deviceID, physicalID)
+			}
+		}
+
+		if plugin.CDIEnabled {
+			plugin.updateContainerAllocateResponseForCDI(&car, req)
+		} else {
+			var mountsList = hpecxi.DiscoverMounts()
+
+			devices := hpecxi.DiscoverDevices()
+			devicesList := devices.ConvertToDeviceSpecs()
+			devicesList = plugin.filterDevicesByVirtualIDs(devicesList, req.DevicesIDs)
+
+			car.Mounts = append(car.Mounts, cxicdi.ConvertMountstoMounts(mountsList)...)
+			car.Devices = append(car.Devices, devicesList...)
+			car.Envs = envVars
+		}
+
+		response.ContainerResponses = append(response.ContainerResponses, &car)
 	}
-
-	response.ContainerResponses = append(response.ContainerResponses, &car)
-
 	return &response, nil
 }
 

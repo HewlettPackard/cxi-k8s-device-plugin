@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"regexp"
+	"strconv"
 	"strings"
 
 	"k8s.io/klog/v2"
@@ -25,6 +27,9 @@ const (
 	libcxiName        = "libcxi.so"
 
 	PCIAddressLength = len("0000:00:00.0")
+
+	virtualDevicesEnvVarName   = "CXI_VIRTUAL_DEVICES"
+	virtualDevicesDefaultValue = "0"
 )
 
 func GetSysfsRoot(sysfsPath string) string {
@@ -124,6 +129,19 @@ func existInPath(libName, libPath string, exists *bool) error {
 	return nil
 }
 
+func GetVirtualDevicesCount() int {
+	virtualDevicesPerPhysical, found := os.LookupEnv(virtualDevicesEnvVarName)
+	if !found {
+		virtualDevicesPerPhysical = virtualDevicesDefaultValue
+	}
+	count, err := strconv.Atoi(virtualDevicesPerPhysical)
+	if err != nil {
+		klog.Errorf("Error parsing %s: %v", virtualDevicesEnvVarName, err)
+		return 0
+	}
+	return count
+}
+
 func PciInfoFromDeviceUID(deviceUID string) (string, string) {
 	// 0000-00-01-0-0x0000 -> 0000:00:01.0, 0x0000
 	rfc1123PCIaddress := deviceUID[:PCIAddressLength]
@@ -140,4 +158,14 @@ func DeviceUIDFromPCIinfo(pciAddress string, pciid string) string {
 	newUID := fmt.Sprintf("%v-%v", rfc1123PCIaddress, pciid)
 
 	return newUID
+}
+
+// ExtractCXINumber extracts the integer after '/dev/cxi' from a device path
+func ExtractCXINumber(devicePath string) (int, error) {
+	re := regexp.MustCompile(`/dev/cxi(\d+)`)
+	matches := re.FindStringSubmatch(devicePath)
+	if len(matches) < 2 {
+		return 0, fmt.Errorf("no CXI number found in device path: %s", devicePath)
+	}
+	return strconv.Atoi(matches[1])
 }
