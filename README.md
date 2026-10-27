@@ -1,4 +1,7 @@
 # CXI Kubernetes device plugin
+![Tests](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/caio-davi/40551c54cd6c4079844a78fd6b46211f/raw/go-tests-badge.json&cacheSeconds=300)
+![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/caio-davi/40551c54cd6c4079844a78fd6b46211f/raw/coverage-badge.json&cacheSeconds=300)
+[![Go Report Card](https://goreportcard.com/badge/github.com/HewlettPackard/cxi-k8s-device-plugin)](https://goreportcard.com/report/github.com/HewlettPackard/cxi-k8s-device-plugin)
 
 > [!CAUTION]
 This is a beta software, not recommended for production systems.
@@ -133,12 +136,13 @@ cxi-cdi-generator --cdi-dir {dir_path}
 You may also use `cxi-cdi-generator --help` for more options. 
 
 ### Environment Variables
- 
+
+During execution, `cxi-cdi-generator` looks in the default paths below for device and library discovery. Set the corresponding environment variable if any component is installed in a different location.
+
 | EnvVar              | Default Value     | Details                                      |
 | ------------------- | ----------------- | -------------------------------------------- |
 | SYSFS_ROOT          | `/sys`            | SystemFs path on host                        |
 | DEVFS_ROOT          | `/dev`            | DevFs path on host                           |
-| OFI_ROOT            | `/opt/cray/lib64` | Libfabric pathon host                        |
+| OFI_ROOT            | `/opt/cray/lib64` | Libfabric path on host                       |
 | CXI_ROOT            | `/usr/lib64`      | Libcxi path on host                          |
-| CXI_VIRTUAL_DEVICES | `0`               | Number of virtual devices per phyical device |
-
+| CXI_VIRTUAL_DEVICES | `0`               | Number of virtual devices per physical device |
