@@ -137,7 +137,7 @@ You may also use `cxi-cdi-generator --help` for more options.
 
 ### Environment Variables
 
-During execution, `cxi-cdi-generator` will look into the following default paths for the discovery process. If any of these components are placed in a different path in your system, you can set it up using the corresponding environment variable.
+During execution, `cxi-cdi-generator` looks in the default paths below for device and library discovery. Set the corresponding environment variable if any component is installed in a different location.
 
 | EnvVar              | Default Value     | Details                                      |
 | ------------------- | ----------------- | -------------------------------------------- |

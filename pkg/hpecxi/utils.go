@@ -12,30 +12,47 @@ import (
 )
 
 const (
-	SysfsEnvVarName  = "SYSFS_ROOT"
+	// SysfsEnvVarName is the environment variable name for overriding the default sysfs root path
+	SysfsEnvVarName = "SYSFS_ROOT"
+	// sysfsDefaultRoot is the default sysfs root directory on Linux systems
 	sysfsDefaultRoot = "/sys"
 
-	DevfsEnvVarName  = "DEVFS_ROOT"
+	// DevfsEnvVarName is the environment variable name for overriding the default device filesystem root
+	DevfsEnvVarName = "DEVFS_ROOT"
+	// devfsDefaultRoot is the default device filesystem root directory
 	devfsDefaultRoot = "/dev"
 
-	LibfabricEnvVarName  = "OFI_ROOT"
+	// LibfabricEnvVarName is the environment variable name for specifying libfabric library location
+	LibfabricEnvVarName = "OFI_ROOT"
+	// libfabricDefaultRoot is the default path where libfabric libraries are typically installed
 	libfabricDefaultRoot = "/opt/cray/lib64"
-	libfabricName        = "libfabric.so"
+	// libfabricName is the base name of the libfabric shared library
+	libfabricName = "libfabric.so"
 
-	LibcxiEnvVarName  = "CXI_ROOT"
+	// LibcxiEnvVarName is the environment variable name for specifying libcxi library location
+	LibcxiEnvVarName = "CXI_ROOT"
+	// libcxiDefaultRoot is the default path where libcxi libraries are typically installed
 	libcxiDefaultRoot = "/usr/lib64"
-	libcxiName        = "libcxi.so"
+	// libcxiName is the base name of the libcxi shared library
+	libcxiName = "libcxi.so"
 
+	// PCIAddressLength defines the expected length of a PCI address in DBDF format (0000:00:00.0)
 	PCIAddressLength = len("0000:00:00.0")
 
-	virtualDevicesEnvVarName   = "CXI_VIRTUAL_DEVICES"
+	// virtualDevicesEnvVarName is the environment variable name for configuring virtual devices per physical device
+	virtualDevicesEnvVarName = "CXI_VIRTUAL_DEVICES"
+	// virtualDevicesDefaultValue is the default number of virtual devices per physical device
 	virtualDevicesDefaultValue = "0"
 )
 
+// GetSysfsRoot returns the sysfs root directory to use for device discovery.
+// It first checks the SYSFS_ROOT environment variable for a custom location,
+// validating that the specified path exists. If not found or invalid, it falls back to the default "/sys".
 func GetSysfsRoot(sysfsPath string) string {
 	sysfsRoot, found := os.LookupEnv(SysfsEnvVarName)
 
 	if found {
+		// Validate that the custom sysfs path exists
 		if _, err := os.Stat(path.Join(sysfsRoot, sysfsPath)); err == nil {
 			klog.V(4).Infof("using custom sysfs location: %v\n", sysfsRoot)
 			return sysfsRoot
@@ -48,10 +65,14 @@ func GetSysfsRoot(sysfsPath string) string {
 	return sysfsDefaultRoot
 }
 
+// GetDevRoot returns the device filesystem root directory to use for device access.
+// It first checks the DEVFS_ROOT environment variable for a custom location,
+// validating that the specified path exists. If not found or invalid, it falls back to the default "/dev".
 func GetDevRoot(devPath string) string {
 	devfsRoot, found := os.LookupEnv(DevfsEnvVarName)
 
 	if found {
+		// Validate that the custom devfs path exists
 		if _, err := os.Stat(path.Join(devfsRoot, devPath)); err == nil {
 			klog.V(4).Infof("using custom devfs location: %v\n", devfsRoot)
 			return devfsRoot
@@ -64,9 +85,13 @@ func GetDevRoot(devPath string) string {
 	return devfsDefaultRoot
 }
 
+// GetLibfabricRoot locates the libfabric library installation directory.
+// It first checks the OFI_ROOT environment variable for a custom location,
+// then falls back to the default path. Returns an error if libfabric is not found in either location.
 func GetLibfabricRoot() (string, error) {
 	libfabricRoot, found := os.LookupEnv(LibfabricEnvVarName)
 	if found {
+		// Check if libfabric exists in the custom location
 		exists := false
 		err := existInPath(libfabricName, libfabricRoot, &exists)
 		if err != nil {
@@ -77,6 +102,7 @@ func GetLibfabricRoot() (string, error) {
 			return libfabricRoot, nil
 		}
 	}
+	// Fall back to default location
 	exists := false
 	err := existInPath(libfabricName, libfabricDefaultRoot, &exists)
 	if err != nil {
@@ -89,9 +115,13 @@ func GetLibfabricRoot() (string, error) {
 	return "", fmt.Errorf("no Libfabric found")
 }
 
+// GetLibcxiRoot locates the libcxi library installation directory.
+// It first checks the CXI_ROOT environment variable for a custom location,
+// then falls back to the default path. Returns an error if libcxi is not found in either location.
 func GetLibcxiRoot() (string, error) {
 	libcxiRoot, found := os.LookupEnv(LibcxiEnvVarName)
 	if found {
+		// Check if libcxi exists in the custom location
 		exists := false
 		err := existInPath(libcxiName, libcxiRoot, &exists)
 		if err != nil {
@@ -102,6 +132,7 @@ func GetLibcxiRoot() (string, error) {
 			return libcxiRoot, nil
 		}
 	}
+	// Fall back to default location
 	exists := false
 	err := existInPath(libcxiName, libcxiDefaultRoot, &exists)
 	if err != nil {
@@ -114,6 +145,9 @@ func GetLibcxiRoot() (string, error) {
 	return "", fmt.Errorf("no libcxi found")
 }
 
+// existInPath checks if a file with the given name prefix exists in the specified directory.
+// It sets the exists boolean pointer to true if a matching file is found, false otherwise.
+// Returns an error if the directory cannot be read.
 func existInPath(libName, libPath string, exists *bool) error {
 	fileInfos, err := os.ReadDir(libPath)
 	if err != nil {
@@ -121,6 +155,7 @@ func existInPath(libName, libPath string, exists *bool) error {
 		return err
 	}
 	*exists = false
+	// Check each file to see if it starts with the library name
 	for _, fileInfo := range fileInfos {
 		if strings.HasPrefix(fileInfo.Name(), libName) {
 			*exists = true
@@ -129,6 +164,9 @@ func existInPath(libName, libPath string, exists *bool) error {
 	return nil
 }
 
+// GetVirtualDevicesCount reads the number of virtual devices per physical device from environment.
+// It checks the CXI_VIRTUAL_DEVICES environment variable, defaulting to 0 if not set or invalid.
+// Returns 0 if the environment variable contains an invalid integer value.
 func GetVirtualDevicesCount() int {
 	virtualDevicesPerPhysical, found := os.LookupEnv(virtualDevicesEnvVarName)
 	if !found {
@@ -142,6 +180,9 @@ func GetVirtualDevicesCount() int {
 	return count
 }
 
+// PciInfoFromDeviceUID extracts PCI address and device ID from a device UID.
+// Converts from RFC1123-compatible format (0000-00-01-0-0x0000) to standard PCI format (0000:00:01.0).
+// Returns the PCI address in DBDF notation and the device ID separately.
 func PciInfoFromDeviceUID(deviceUID string) (string, string) {
 	// 0000-00-01-0-0x0000 -> 0000:00:01.0, 0x0000
 	rfc1123PCIaddress := deviceUID[:PCIAddressLength]
@@ -151,6 +192,9 @@ func PciInfoFromDeviceUID(deviceUID string) (string, string) {
 	return pciAddress, deviceId
 }
 
+// DeviceUIDFromPCIinfo creates a device UID from PCI address and device ID.
+// Converts from standard PCI format (0000:00:01.0) to RFC1123-compatible format (0000-00-01-0-0x0000).
+// This format is safe for use as Kubernetes resource names and identifiers.
 func DeviceUIDFromPCIinfo(pciAddress string, pciid string) string {
 	// 0000:00:01.0, 0x0000 -> 0000-00-01-0-0x0000
 	// Replace colons and the dot in PCI address with hyphens.

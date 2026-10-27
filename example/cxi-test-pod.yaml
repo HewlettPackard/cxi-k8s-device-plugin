@@ -13,6 +13,10 @@ spec:
         - "3600"
       resources:
         requests:
-          beta.hpe.com/cxi: 4 # requesting four NIC
+          cpu: "100m"
+          memory: "128Mi"
+          beta.hpe.com/cxi: "2" # requesting four NIC
         limits:
-          beta.hpe.com/cxi: 4 # requesting four NIC
+          cpu: "100m"
+          memory: "128Mi"
+          beta.hpe.com/cxi: "2" # requesting four NIC

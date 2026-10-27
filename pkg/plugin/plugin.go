@@ -1,3 +1,10 @@
+// Package plugin provides a Kubernetes device plugin implementation for HPE CXI (Cassini) networking devices.
+// It implements the device plugin framework to manage physical HPE Slingshot NICs and their virtual device instances,
+// enabling containers to access high-performance network resources with proper device isolation and sharing.
+//
+// The plugin supports both direct device access and Container Device Interface (CDI) specifications,
+// allowing flexible device management in Kubernetes environments. It handles device discovery,
+// health monitoring, and resource allocation for HPE CXI devices.
 package plugin
 
 import (
@@ -19,30 +26,35 @@ import (
 
 const resourceNamespace string = "beta.hpe.com"
 
+// envVars defines default environment variables set for containers accessing CXI devices.
+// These ensure proper library paths for libfabric and libcxi are available in the container.
 var envVars = map[string]string{
 	"LD_LIBRARY_PATH": "/opt/cray/lib64:/usr/lib64",
 }
 
-// Plugin is identical to DevicePluginServer interface of device plugin API.
+// HPECXIPlugin implements the Kubernetes device plugin interface for HPE CXI devices.
+// It manages both physical CXI devices and virtual device instances, providing device sharing
+// capabilities while maintaining proper isolation. The plugin supports health monitoring,
+// resource allocation, and optional CDI (Container Device Interface) integration.
 type HPECXIPlugin struct {
-	CXIs                 map[string]int
-	VirtualToPhysicalMap map[string]int
-	Heartbeat            chan bool
-	signal               chan os.Signal
-	CDIEnabled           bool
-	CDIPath              string
-	CDI                  *specs.Spec
+	CXIs                 map[string]int // Maps device names to their physical device IDs
+	VirtualToPhysicalMap map[string]int // Maps virtual device IDs to physical device IDs for sharing
+	Heartbeat            chan bool      // Channel for health check triggers
+	signal               chan os.Signal // Channel for graceful shutdown signals
+	CDIEnabled           bool           // Whether Container Device Interface is enabled
+	CDIPath              string         // Path to CDI specification files
+	CDI                  *specs.Spec    // CDI specification for device management
 }
 
-// Lister serves as an interface between imlementation and Manager machinery. User passes
-// implementation of this interface to NewManager function. Manager will use it to obtain resource
-// namespace, monitor available resources and instantate a new plugin for them.
+// HPECXILister implements the device plugin manager's Lister interface for HPE CXI devices.
+// It serves as the interface between the CXI device implementation and the device plugin manager,
+// handling resource discovery, monitoring, and plugin instantiation for CXI networking devices.
 type HPECXILister struct {
-	ResUpdateChan chan dpm.PluginNameList
-	Heartbeat     chan bool
-	Signal        chan os.Signal
-	CDIEnabled    bool
-	CDIPath       string
+	ResUpdateChan chan dpm.PluginNameList // Channel for resource update notifications
+	Heartbeat     chan bool               // Channel for health monitoring triggers
+	Signal        chan os.Signal          // Channel for shutdown signal handling
+	CDIEnabled    bool                    // Whether CDI support should be enabled for new plugins
+	CDIPath       string                  // Path to CDI specifications for new plugins
 }
 
 func (l *HPECXILister) NewPlugin(resourceLastName string) dpm.PluginInterface {
@@ -79,6 +91,9 @@ func (p *HPECXIPlugin) Stop() error {
 	return nil
 }
 
+// cxiSimpleHealthCheck performs a basic health check on a CXI device by attempting to open its device file.
+// It returns pluginapi.Healthy if the device can be opened successfully, or pluginapi.Unhealthy otherwise.
+// This ensures that only accessible devices are reported as available to Kubernetes.
 func cxiSimpleHealthCheck(device *pluginapi.Device) string {
 	var cxi *os.File
 	var err error
@@ -103,9 +118,16 @@ func (plugin *HPECXIPlugin) PreStartContainer(ctx context.Context, r *pluginapi.
 	return &pluginapi.PreStartContainerResponse{}, nil
 }
 
-// ListAndWatch returns a stream of List of Devices
-// Whenever a Device state change or a Device disappears, ListAndWatch
-// returns the new list
+// ListAndWatch implements the device plugin's ListAndWatch method, which discovers and monitors HPE CXI devices.
+// It creates virtual device instances from physical CXI devices to enable device sharing among containers.
+// The function continuously monitors device health and reports device status changes to Kubernetes.
+//
+// Key functionality:
+// - Discovers physical CXI devices on the system
+// - Creates configurable number of virtual devices per physical device for sharing
+// - Continuously monitors device health via periodic health checks
+// - Reports device availability and health status to Kubernetes device manager
+// - Handles graceful shutdown signals
 func (plugin *HPECXIPlugin) ListAndWatch(e *pluginapi.Empty, s pluginapi.DevicePlugin_ListAndWatchServer) error {
 	if plugin.CXIs == nil {
 		plugin.CXIs = make(map[string]int)
@@ -118,7 +140,7 @@ func (plugin *HPECXIPlugin) ListAndWatch(e *pluginapi.Empty, s pluginapi.DeviceP
 
 	var devicesList = hpecxi.DiscoverDevices()
 
-	// Create multiple virtual devices for each physical device
+	// Create multiple virtual devices for each physical device to enable sharing
 	virtualDeviceIndex := 0
 	for _, device := range devicesList {
 		klog.Infof("Discovered physical device: %s", device.Name)
@@ -185,7 +207,10 @@ func (plugin *HPECXIPlugin) GetPreferredAllocation(context.Context, *pluginapi.P
 	return &pluginapi.PreferredAllocationResponse{}, nil
 }
 
-// filterDevicesByVirtualIDs filters the physical devices based on requested virtual device IDs
+// filterDevicesByVirtualIDs filters physical device specifications based on requested virtual device IDs.
+// Since virtual devices map to physical devices, this function determines which physical CXI devices
+// should be allocated based on the virtual device requests. This enables device sharing while ensuring
+// the correct physical devices are made available to containers.
 func (plugin *HPECXIPlugin) filterDevicesByVirtualIDs(devicesList []*pluginapi.DeviceSpec, requestedDeviceIDs []string) []*pluginapi.DeviceSpec {
 	// Get unique physical device IDs that correspond to the requested virtual devices
 	physicalDeviceIDs := make(map[int]bool)
@@ -206,6 +231,10 @@ func (plugin *HPECXIPlugin) filterDevicesByVirtualIDs(devicesList []*pluginapi.D
 	return filteredDevices
 }
 
+// updateContainerAllocateResponseForCDI updates the container allocation response with CDI specifications.
+// When CDI is enabled, this function retrieves device specs, mounts, and environment variables from
+// the CDI specification and applies them to the allocation response. It filters devices based on
+// the requested virtual device IDs to ensure proper device mapping.
 func (plugin *HPECXIPlugin) updateContainerAllocateResponseForCDI(car *pluginapi.ContainerAllocateResponse, req *pluginapi.ContainerAllocateRequest) {
 	if !plugin.CDIEnabled {
 		return
@@ -226,19 +255,21 @@ func (plugin *HPECXIPlugin) updateContainerAllocateResponseForCDI(car *pluginapi
 // of the steps to make the Device available in the container
 func (plugin *HPECXIPlugin) Allocate(ctx context.Context, r *pluginapi.AllocateRequest) (*pluginapi.AllocateResponse, error) {
 	var response pluginapi.AllocateResponse
+
 	for _, req := range r.ContainerRequests {
 
 		// TODO:  assert(len(req.DevicesIDs) <= len(HPECXIPlugin.CXIs))
 		// TODO:  assert requested devices are not mapped to the same physical device.
 		car := pluginapi.ContainerAllocateResponse{}
 
-		// Log which virtual devices are being allocated
+		// Log which virtual devices are being allocated and their physical mapping
 		for _, deviceID := range req.DevicesIDs {
 			if physicalID, exists := plugin.VirtualToPhysicalMap[deviceID]; exists {
 				klog.Infof("Allocating virtual device %s (maps to physical device %d)", deviceID, physicalID)
 			}
 		}
 
+		// Use either CDI specification or direct device allocation based on configuration
 		if plugin.CDIEnabled {
 			plugin.updateContainerAllocateResponseForCDI(&car, req)
 		} else {
@@ -248,13 +279,14 @@ func (plugin *HPECXIPlugin) Allocate(ctx context.Context, r *pluginapi.AllocateR
 			devicesList := devices.ConvertToDeviceSpecs()
 			devicesList = plugin.filterDevicesByVirtualIDs(devicesList, req.DevicesIDs)
 
-			car.Mounts = append(car.Mounts, cxicdi.ConvertMountstoMounts(mountsList)...)
+			car.Mounts = append(car.Mounts, cxicdi.ConvertCDIMountsToSpecMounts(mountsList)...)
 			car.Devices = append(car.Devices, devicesList...)
 			car.Envs = envVars
 		}
 
 		response.ContainerResponses = append(response.ContainerResponses, &car)
 	}
+
 	return &response, nil
 }
 
