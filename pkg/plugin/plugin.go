@@ -103,6 +103,9 @@ func (plugin *HPECXIPlugin) PreStartContainer(ctx context.Context, r *pluginapi.
 	return &pluginapi.PreStartContainerResponse{}, nil
 }
 
+// ListAndWatch returns a stream of List of Devices
+// Whenever a Device state change or a Device disappears, ListAndWatch
+// returns the new list
 func (plugin *HPECXIPlugin) ListAndWatch(e *pluginapi.Empty, s pluginapi.DevicePlugin_ListAndWatchServer) error {
 	if plugin.CXIs == nil {
 		plugin.CXIs = make(map[string]int)
@@ -203,7 +206,6 @@ func (plugin *HPECXIPlugin) filterDevicesByVirtualIDs(devicesList []*pluginapi.D
 	return filteredDevices
 }
 
-// updateResponseForCDI updates the ContainerAllocateResponse with CDI specs
 func (plugin *HPECXIPlugin) updateContainerAllocateResponseForCDI(car *pluginapi.ContainerAllocateResponse, req *pluginapi.ContainerAllocateRequest) {
 	if !plugin.CDIEnabled {
 		return
@@ -224,7 +226,6 @@ func (plugin *HPECXIPlugin) updateContainerAllocateResponseForCDI(car *pluginapi
 // of the steps to make the Device available in the container
 func (plugin *HPECXIPlugin) Allocate(ctx context.Context, r *pluginapi.AllocateRequest) (*pluginapi.AllocateResponse, error) {
 	var response pluginapi.AllocateResponse
-
 	for _, req := range r.ContainerRequests {
 
 		// TODO:  assert(len(req.DevicesIDs) <= len(HPECXIPlugin.CXIs))
@@ -254,7 +255,6 @@ func (plugin *HPECXIPlugin) Allocate(ctx context.Context, r *pluginapi.AllocateR
 
 		response.ContainerResponses = append(response.ContainerResponses, &car)
 	}
-
 	return &response, nil
 }
 
